@@ -22,7 +22,29 @@ const html = await renderPackageToHtml(pkg);
 document.getElementById("preview").innerHTML = html;
 ```
 
-C'est tout pour le cas simple : `loadReqIfPackage` détecte automatiquement si l'entrée est du XML brut (`.reqif`) ou une archive zip (`.reqifz`), extrait les pièces jointes, et `renderPackageToHtml` produit un bloc HTML autonome (avec son propre `<style>` scoping `.reqif-preview`) — arborescence des spécifications, attributs de chaque exigence, texte enrichi (gras/italique/listes/tableaux), images intégrées en `data:` URI.
+C'est tout pour le cas simple : `loadReqIfPackage` détecte automatiquement si l'entrée est du XML brut (`.reqif`) ou une archive zip (`.reqifz`), extrait les pièces jointes, et `renderPackageToHtml` produit un bloc HTML autonome (avec son propre `<style>` scoping `.reqif-preview`) — arborescence des spécifications, texte enrichi (gras/italique/listes/tableaux), images intégrées en `data:` URI.
+
+### Mode simple par défaut
+
+Pour chaque exigence, seuls trois éléments sont affichés sans action de l'utilisateur :
+- le **titre** (résumé cliquable de l'arborescence) ;
+- l'**ID** (`IDENTIFIER` ReqIF de l'objet) ;
+- le **texte enrichi** (contenu des attributs de type XHTML — la description/le corps de l'exigence).
+
+Tous les autres attributs (chaînes, nombres, dates, énumérations, booléens...) sont regroupés dans un panneau **« Détails techniques »**, replié par défaut, qu'on déplie d'un clic (un `<details>/<summary>` natif — aucun JavaScript requis) :
+
+```ts
+// Replié par défaut. Pour l'afficher déplié d'entrée :
+const html = await renderPackageToHtml(pkg, { showTechnicalByDefault: true });
+```
+
+Les libellés sont en français par défaut et personnalisables :
+
+```ts
+const html = await renderPackageToHtml(pkg, {
+  labels: { technicalDetails: "Technical details", yes: "Yes", no: "No" },
+});
+```
 
 ### Dans le navigateur, depuis un `<input type="file">`
 

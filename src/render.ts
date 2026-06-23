@@ -21,11 +21,29 @@ import type {
 export interface RenderLabels {
   noContent: string;
   untitled: string;
+  idLabel: string;
+  technicalDetails: string;
+  headerTitle: string;
+  headerSourceTool: string;
+  headerExportedBy: string;
+  headerCreationTime: string;
+  headerComment: string;
+  yes: string;
+  no: string;
 }
 
 const DEFAULT_LABELS: RenderLabels = {
-  noContent: "(empty)",
-  untitled: "(untitled)",
+  noContent: "(vide)",
+  untitled: "(sans titre)",
+  idLabel: "ID",
+  technicalDetails: "Détails techniques",
+  headerTitle: "Titre",
+  headerSourceTool: "Outil source",
+  headerExportedBy: "Exporté par",
+  headerCreationTime: "Date de création",
+  headerComment: "Commentaire",
+  yes: "Oui",
+  no: "Non",
 };
 
 export interface RenderOptions {
@@ -37,6 +55,8 @@ export interface RenderOptions {
   labels?: Partial<RenderLabels>;
   /** Skip attributes that have no value at all. Default: true. */
   hideEmptyAttributes?: boolean;
+  /** Render the technical attribute panel expanded by default. Default: false (hidden, toggle to reveal). */
+  showTechnicalByDefault?: boolean;
   /** Max bytes read per attachment before it's left unresolved instead of inlined. Default: 5MB. */
   maxInlineBytes?: number;
 }
@@ -63,7 +83,7 @@ export async function renderDocumentToHtml(
   const index = new ReqIfIndex(doc);
   const lookup = await buildAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
 
-  const header = renderHeader(doc);
+  const header = renderHeader(doc, labels);
   const specs = doc.coreContent.specifications
     .map((spec) => renderSpecification(spec, index, lookup, labels, options))
     .join("");
@@ -93,15 +113,15 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function renderHeader(doc: ReqIfDocument): string {
+function renderHeader(doc: ReqIfDocument, labels: RenderLabels): string {
   const h = doc.header;
   const rows: Array<[string, string]> = (
     [
-      ["Title", h.title],
-      ["Source tool", h.sourceToolId],
-      ["Exported by", h.reqIfToolId],
-      ["Creation time", h.creationTime],
-      ["Comment", h.comment],
+      [labels.headerTitle, h.title],
+      [labels.headerSourceTool, h.sourceToolId],
+      [labels.headerExportedBy, h.reqIfToolId],
+      [labels.headerCreationTime, h.creationTime],
+      [labels.headerComment, h.comment],
     ] as Array<[string, string | undefined]>
   ).filter((row): row is [string, string] => !!row[1]);
   if (rows.length === 0) return "";
@@ -144,6 +164,31 @@ function renderSpecObjectBody(
   labels: RenderLabels,
   options: RenderOptions,
 ): string {
+  const simple = renderSimpleView(obj, attachments, labels);
+  const technical = renderTechnicalPanel(obj, index, attachments, labels, options);
+  return `<div class="reqif-simple">${simple}</div>${technical}`;
+}
+
+/** The "friendly" view: just the object's id and its rich-text (XHTML) content. */
+function renderSimpleView(obj: SpecObject, attachments: AttachmentLookup, labels: RenderLabels): string {
+  const idHtml = `<div class="reqif-id">${escapeHtml(labels.idLabel)}: <code>${escapeHtml(obj.identifier)}</code></div>`;
+  const xhtmlValues = obj.values.filter(
+    (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } => v.kind === "XHTML" && !!v.value,
+  );
+  const contentHtml = xhtmlValues
+    .map((v) => `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`)
+    .join("");
+  return idHtml + (contentHtml || `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`);
+}
+
+/** The "technical" view: every attribute, in the SpecObjectType's declared order — hidden behind a toggle. */
+function renderTechnicalPanel(
+  obj: SpecObject,
+  index: ReqIfIndex,
+  attachments: AttachmentLookup,
+  labels: RenderLabels,
+  options: RenderOptions,
+): string {
   const specType = index.specTypes.get(obj.typeRef);
   const orderedDefs = specType ? specType.specAttributes : [];
   const byDefId = new Map(obj.values.map((v) => [v.definitionRef, v]));
@@ -165,7 +210,13 @@ function renderSpecObjectBody(
   }
 
   if (rows.length === 0) return "";
-  return `<dl class="reqif-attrs">${rows.join("")}</dl>`;
+  const openAttr = options.showTechnicalByDefault ? " open" : "";
+  return (
+    `<details class="reqif-technical"${openAttr}>` +
+    `<summary class="reqif-technical-toggle">${escapeHtml(labels.technicalDetails)}</summary>` +
+    `<dl class="reqif-attrs">${rows.join("")}</dl>` +
+    `</details>`
+  );
 }
 
 function renderAttributeRow(
@@ -177,7 +228,7 @@ function renderAttributeRow(
   options: RenderOptions,
 ): string | undefined {
   const name = def?.longName ?? value?.definitionRef ?? "?";
-  const html = value ? renderAttributeValue(value, index, attachments) : "";
+  const html = value ? renderAttributeValue(value, index, attachments, labels) : "";
   if (!html && options.hideEmptyAttributes !== false) return undefined;
   return (
     `<div class="reqif-attr">` +
@@ -187,10 +238,15 @@ function renderAttributeRow(
   );
 }
 
-function renderAttributeValue(value: AttributeValue, index: ReqIfIndex, attachments: AttachmentLookup): string {
+function renderAttributeValue(
+  value: AttributeValue,
+  index: ReqIfIndex,
+  attachments: AttachmentLookup,
+  labels: RenderLabels,
+): string {
   switch (value.kind) {
     case "BOOLEAN":
-      return value.value === undefined ? "" : value.value ? "Yes" : "No";
+      return value.value === undefined ? "" : value.value ? labels.yes : labels.no;
     case "DATE":
       return value.value ? escapeHtml(value.value) : "";
     case "INTEGER":
@@ -276,4 +332,19 @@ const DEFAULT_CSS = `
 .reqif-attachment { display: inline-flex; align-items: center; gap: 4px; color: #0b62d6; text-decoration: none; }
 .reqif-preview table { border-collapse: collapse; }
 .reqif-preview td, .reqif-preview th { border: 1px solid #ddd; padding: 4px 8px; }
+.reqif-simple { display: flex; flex-direction: column; gap: 8px; }
+.reqif-id { font-size: 11px; color: #999; }
+.reqif-id code { background: #f2f2f2; border-radius: 4px; padding: 1px 6px; color: #555; }
+.reqif-content { font-size: 14px; }
+.reqif-content p:first-child { margin-top: 0; }
+.reqif-technical { margin-top: 10px; }
+.reqif-technical-toggle {
+  display: inline-block; cursor: pointer; list-style: none; user-select: none;
+  font-size: 12px; color: #444; background: #f0f0f0; border: 1px solid #ddd;
+  border-radius: 999px; padding: 3px 10px; width: fit-content;
+}
+.reqif-technical-toggle::-webkit-details-marker { display: none; }
+.reqif-technical-toggle:hover { background: #e6e6e6; }
+.reqif-technical[open] > .reqif-technical-toggle { background: #e0ebfb; border-color: #b6d0f5; }
+.reqif-technical .reqif-attrs { margin-top: 10px; }
 `;

@@ -63,6 +63,45 @@ describe("synthetic fixture: full data-type coverage", () => {
   });
 });
 
+describe("synthetic fixture: simple mode vs technical details", () => {
+  it("shows the id and the rich-text content unconditionally", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).toContain('<div class="reqif-simple">');
+    expect(html).toContain("ID: <code>so-1</code>");
+    expect(html).toContain('<div class="reqif-content">');
+    expect(html).toContain("The user shall be able to");
+  });
+
+  it("hides technical attributes behind a closed <details> toggle by default", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).toContain('<details class="reqif-technical">'); // no "open" attribute
+    expect(html).not.toContain('<details class="reqif-technical" open>');
+    expect(html).toContain("Détails techniques");
+    // The technical attribute names (e.g. "Count", "Ratio") must still be present,
+    // just nested inside the collapsed panel rather than shown unconditionally.
+    expect(html).toContain("Count");
+    expect(html).toContain("Ratio");
+  });
+
+  it("expands the technical panel when showTechnicalByDefault is set", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, showTechnicalByDefault: true });
+    expect(html).toContain('<details class="reqif-technical" open>');
+  });
+
+  it("supports overriding labels (e.g. back to English)", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      labels: { technicalDetails: "Technical details", yes: "Yes", no: "No" },
+    });
+    expect(html).toContain("Technical details");
+    expect(html).toContain(">Yes<"); // ad-active is true in the fixture
+  });
+});
+
 describe("synthetic fixture: rendering & sanitization", () => {
   it("escapes/strips dangerous markup and keeps safe formatting", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
