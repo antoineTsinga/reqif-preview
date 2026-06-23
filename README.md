@@ -32,7 +32,9 @@ Pour chaque exigence, seuls trois éléments sont affichés sans action de l'uti
 - le **texte enrichi** (contenu des attributs de type XHTML — la description/le corps de l'exigence) ;
 - une ligne **« Créé par X · date — Modifié par Y · date »**, clairement étiquetée, si le document fournit ces informations (convention `ReqIF.ForeignCreatedBy/On` et `ReqIF.ForeignModifiedBy/On`, utilisée par DOORS, DOORS Next, ReqEdit, ReqView...). Si modification = création, la ligne "Modifié" n'est pas dupliquée.
 
-Tous les autres attributs (chaînes, nombres, dates, énumérations, booléens...) sont regroupés dans un panneau **« Détails techniques »**, replié par défaut, qu'on déplie d'un clic (un `<details>/<summary>` natif — aucun JavaScript requis). Les attributs déjà affichés ailleurs (ID, créé/modifié) n'y sont pas dupliqués.
+Tous les autres attributs (chaînes, nombres, dates, énumérations, booléens...) sont regroupés dans un panneau **« Détails techniques »**, replié par défaut, qu'on déplie d'un clic (un `<details>/<summary>` natif — aucun JavaScript requis). **Ce panneau liste toujours absolument tous les attributs de l'objet**, y compris ceux déjà résumés ailleurs (ID, créé/modifié) — rien n'y est jamais filtré, pour une transparence totale.
+
+La détection créé/modifié reconnaît `ReqIF.ForeignCreatedBy/On` aussi bien quand ils sont stockés en chaîne simple qu'en XHTML (DOORS exporte parfois ces champs en XHTML) — peu importe le type de donnée déclaré, le texte est extrait correctement.
 
 ```ts
 // Replié par défaut. Pour l'afficher déplié d'entrée :
@@ -79,7 +81,7 @@ const html = await renderPackageToHtml(pkg, {
 - `value` est `undefined` si l'objet ne porte pas cet attribut — retournez `undefined` pour ne rien afficher.
 - `ctx.getValue("Autre attribut")` / `ctx.getDefinition(...)` permettent de lire d'autres attributs de l'objet.
 - `ctx.formatValue(value)` réutilise le même formatage que le panneau technique (résolution des libellés d'énumération, rendu XHTML assaini...).
-- Par défaut, l'attribut ciblé est masqué du panneau technique (déjà affiché via le rendu personnalisé) ; passez `hideFromTechnical: false` pour le garder aussi là-bas.
+- Par défaut, l'attribut ciblé reste aussi visible dans le panneau technique (transparence totale) ; passez `hideFromTechnical: true` si vous voulez l'en masquer puisqu'il est déjà affiché via le rendu personnalisé.
 - Une exception levée dans `render()` est interceptée : elle n'interrompt jamais le rendu du reste du document.
 - Le HTML retourné est inséré tel quel (ce n'est pas du contenu du document ReqIF, mais du code que *vous* écrivez) — échappez vous-même tout texte brut interpolé, par exemple avec `escapeHtml` exporté par la lib.
 

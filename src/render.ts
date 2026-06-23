@@ -87,18 +87,12 @@ export interface RenderOptions {
 const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
 
 /** Renders every document found in a package (a .reqifz may contain several). */
-export async function renderPackageToHtml(
-  pkg: ReqIfPackage,
-  options: RenderOptions = {},
-): Promise<string> {
+export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOptions = {}): Promise<string> {
   const attachments = options.attachments ?? pkg.attachments;
   const parts = await Promise.all(
-    pkg.documents.map((doc) =>
-      renderDocumentToHtml(doc, attachments, { ...options, includeCss: false }),
-    ),
+    pkg.documents.map((doc) => renderDocumentToHtml(doc, attachments, { ...options, includeCss: false })),
   );
-  const css =
-    options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
+  const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
   return `${css}<div class="reqif-preview">${parts.join("")}</div>`;
 }
 
@@ -110,19 +104,14 @@ export async function renderDocumentToHtml(
 ): Promise<string> {
   const labels: RenderLabels = { ...DEFAULT_LABELS, ...options.labels };
   const index = new ReqIfIndex(doc);
-  const lookup = await buildAttachmentLookup(
-    doc,
-    attachments,
-    options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES,
-  );
+  const lookup = await buildAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
 
   const header = renderHeader(doc, labels);
   const specs = doc.coreContent.specifications
     .map((spec) => renderSpecification(spec, index, lookup, labels, options))
     .join("");
 
-  const css =
-    options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
+  const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
   return `${css}<div class="reqif-preview">${header}<div class="reqif-specs">${specs}</div></div>`;
 }
 
@@ -135,9 +124,7 @@ export function renderSpecification(
   options: RenderOptions = {},
 ): string {
   const title = escapeHtml(spec.longName || labels.untitled);
-  const nodes = spec.children
-    .map((n) => renderHierarchyNode(n, index, attachments, labels, options))
-    .join("");
+  const nodes = spec.children.map((n) => renderHierarchyNode(n, index, attachments, labels, options)).join("");
   return `<section class="reqif-spec"><h2 class="reqif-spec-title">${title}</h2><div class="reqif-tree">${nodes}</div></section>`;
 }
 
@@ -158,9 +145,7 @@ function formatDate(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   try {
-    return new Intl.DateTimeFormat(locale, {
-      dateStyle: "medium",
-    } as Intl.DateTimeFormatOptions).format(d);
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium" } as Intl.DateTimeFormatOptions).format(d);
   } catch {
     return iso;
   }
@@ -199,17 +184,13 @@ function renderHierarchyNode(
     ? renderSpecObjectBody(obj, index, attachments, labels, options)
     : `<p class="reqif-missing">${labels.noContent}</p>`;
   const title = escapeHtml(obj?.longName || node.longName || labels.untitled);
-  const childrenHtml = node.children
-    .map((c) => renderHierarchyNode(c, index, attachments, labels, options))
-    .join("");
+  const childrenHtml = node.children.map((c) => renderHierarchyNode(c, index, attachments, labels, options)).join("");
 
   return (
     `<details class="reqif-node" open>` +
     `<summary class="reqif-node-title">${title}</summary>` +
     `<div class="reqif-node-body">${body}</div>` +
-    (childrenHtml
-      ? `<div class="reqif-node-children">${childrenHtml}</div>`
-      : "") +
+    (childrenHtml ? `<div class="reqif-node-children">${childrenHtml}</div>` : "") +
     `</details>`
   );
 }
@@ -225,25 +206,8 @@ function renderSpecObjectBody(
   const lifecycle = extractLifecycleInfo(obj, index);
   const dateLocale = options.dateLocale ?? "fr-FR";
 
-  const simple = renderSimpleView(
-    obj,
-    specType,
-    index,
-    attachments,
-    labels,
-    options,
-    lifecycle,
-    dateLocale,
-  );
-  const technical = renderTechnicalPanel(
-    obj,
-    specType,
-    index,
-    attachments,
-    labels,
-    options,
-    lifecycle,
-  );
+  const simple = renderSimpleView(obj, specType, index, attachments, labels, options, lifecycle, dateLocale);
+  const technical = renderTechnicalPanel(obj, specType, index, attachments, labels, options);
   return `<div class="reqif-simple">${simple}</div>${technical}`;
 }
 
@@ -264,41 +228,23 @@ function renderSimpleView(
 
   const formatValue = (value: AttributeValue | undefined) =>
     value ? renderAttributeValue(value, index, attachments, labels) : "";
-  const ctx = buildAttributeRenderContext(
-    obj,
-    specType,
-    index,
-    attachments,
-    formatValue,
-  );
-  const before = renderCustomAttributes(
-    options.customAttributeRenderers,
-    "before",
-    ctx,
-  );
-  const after = renderCustomAttributes(
-    options.customAttributeRenderers,
-    "after",
-    ctx,
-  );
+  const ctx = buildAttributeRenderContext(obj, specType, index, attachments, formatValue);
+  const before = renderCustomAttributes(options.customAttributeRenderers, "before", ctx);
+  const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx);
 
   const xhtmlValues = obj.values.filter(
     (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } =>
-      v.kind === "XHTML" && !!v.value,
+      v.kind === "XHTML" && !!v.value && !lifecycle.consumedDefinitionIds.has(v.definitionRef),
   );
   const contentHtml = xhtmlValues
-    .map(
-      (v) =>
-        `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`,
-    )
+    .map((v) => `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`)
     .join("");
 
   return (
     idHtml +
     metaHtml +
     before +
-    (contentHtml ||
-      `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`) +
+    (contentHtml || `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`) +
     after
   );
 }
@@ -318,8 +264,7 @@ function renderLifecycleMeta(
   );
 
   const isSameAsCreated =
-    lifecycle.modifiedBy === lifecycle.createdBy &&
-    lifecycle.modifiedOn === lifecycle.createdOn;
+    lifecycle.modifiedBy === lifecycle.createdBy && lifecycle.modifiedOn === lifecycle.createdOn;
   const modifiedChip = isSameAsCreated
     ? undefined
     : lifecycleChip(
@@ -342,19 +287,15 @@ function lifecycleChip(
   onLabel: string,
   dateLocale: string,
 ): string | undefined {
-  console.log("lifecycleChip", { by, on, byLabel, onLabel, dateLocale });
   if (!by && !on) return undefined;
   const role = by ? byLabel : onLabel;
   const bits = [`<span class="reqif-meta-role">${escapeHtml(role)}</span>`];
   if (by) bits.push(`<strong>${escapeHtml(by)}</strong>`);
-  if (on)
-    bits.push(
-      `<time datetime="${escapeAttr(on)}">${escapeHtml(formatDate(on, dateLocale))}</time>`,
-    );
+  if (on) bits.push(`<time datetime="${escapeAttr(on)}">${escapeHtml(formatDate(on, dateLocale))}</time>`);
   return `<span class="reqif-meta-chip">${bits.join(" ")}</span>`;
 }
 
-/** The "technical" view: every other attribute, in the SpecObjectType's declared order — hidden behind a toggle. */
+/** The "technical" view: literally every attribute, in the SpecObjectType's declared order — hidden behind a toggle, never filtered. */
 function renderTechnicalPanel(
   obj: SpecObject,
   specType: SpecType | undefined,
@@ -362,20 +303,14 @@ function renderTechnicalPanel(
   attachments: AttachmentLookup,
   labels: RenderLabels,
   options: RenderOptions,
-  lifecycle: ReturnType<typeof extractLifecycleInfo>,
 ): string {
   const orderedDefs = specType ? specType.specAttributes : [];
   const byDefId = new Map(obj.values.map((v) => [v.definitionRef, v]));
 
-  // Attributes already surfaced elsewhere (id badge, created/modified line,
-  // custom renderers) are excluded here so nothing is shown twice without context.
-  const hidden = new Set(lifecycle.consumedDefinitionIds);
-  for (const id of collectHiddenDefinitionIds(
-    options.customAttributeRenderers,
-    obj,
-    index,
-  ))
-    hidden.add(id);
+  // Only an explicit `hideFromTechnical: true` on a custom renderer can hide
+  // a row here — by default (including created/modified/foreignId, which
+  // are also surfaced above) every attribute is shown, for full transparency.
+  const hidden = collectHiddenDefinitionIds(options.customAttributeRenderers, obj, index);
 
   const seen = new Set<string>();
   const rows: string[] = [];
@@ -383,27 +318,12 @@ function renderTechnicalPanel(
     seen.add(def.identifier);
     if (hidden.has(def.identifier)) continue;
     const value = byDefId.get(def.identifier);
-    const html = renderAttributeRow(
-      def,
-      value,
-      index,
-      attachments,
-      labels,
-      options,
-    );
+    const html = renderAttributeRow(def, value, index, attachments, labels, options);
     if (html) rows.push(html);
   }
   for (const value of obj.values) {
-    if (seen.has(value.definitionRef) || hidden.has(value.definitionRef))
-      continue;
-    const html = renderAttributeRow(
-      undefined,
-      value,
-      index,
-      attachments,
-      labels,
-      options,
-    );
+    if (seen.has(value.definitionRef) || hidden.has(value.definitionRef)) continue;
+    const html = renderAttributeRow(undefined, value, index, attachments, labels, options);
     if (html) rows.push(html);
   }
 
@@ -426,9 +346,7 @@ function renderAttributeRow(
   options: RenderOptions,
 ): string | undefined {
   const name = def?.longName ?? value?.definitionRef ?? "?";
-  const html = value
-    ? renderAttributeValue(value, index, attachments, labels)
-    : "";
+  const html = value ? renderAttributeValue(value, index, attachments, labels) : "";
   if (!html && options.hideEmptyAttributes !== false) return undefined;
   return (
     `<div class="reqif-attr">` +
@@ -446,11 +364,7 @@ function renderAttributeValue(
 ): string {
   switch (value.kind) {
     case "BOOLEAN":
-      return value.value === undefined
-        ? ""
-        : value.value
-          ? labels.yes
-          : labels.no;
+      return value.value === undefined ? "" : value.value ? labels.yes : labels.no;
     case "DATE":
       return value.value ? escapeHtml(value.value) : "";
     case "INTEGER":
@@ -461,9 +375,7 @@ function renderAttributeValue(
     case "ENUMERATION":
       return index.enumLabels(value.valueRefs).map(escapeHtml).join(", ");
     case "XHTML":
-      return value.value
-        ? renderXhtmlContent(value.value, { attachments })
-        : "";
+      return value.value ? renderXhtmlContent(value.value, { attachments }) : "";
     default:
       return "";
   }
@@ -480,8 +392,7 @@ async function buildAttachmentLookup(
   maxInlineBytes: number,
 ): Promise<AttachmentLookup> {
   const paths = new Set<string>();
-  for (const content of collectAllXhtmlContents(doc))
-    collectReferencedPaths(content, paths);
+  for (const content of collectAllXhtmlContents(doc)) collectReferencedPaths(content, paths);
 
   const resolved = new Map<string, { href: string; mimeType?: string }>();
   await Promise.all(
@@ -491,10 +402,7 @@ async function buildAttachmentLookup(
       if (attachment.size > maxInlineBytes) return; // too big to inline; left unresolved on purpose
       const bytes = await attachment.getBytes();
       const mimeType = attachment.mimeType ?? "application/octet-stream";
-      resolved.set(path, {
-        href: `data:${mimeType};base64,${toBase64(bytes)}`,
-        mimeType,
-      });
+      resolved.set(path, { href: `data:${mimeType};base64,${toBase64(bytes)}`, mimeType });
     }),
   );
 
@@ -504,14 +412,12 @@ async function buildAttachmentLookup(
 function collectAllXhtmlContents(doc: ReqIfDocument): XhtmlContent[] {
   const out: XhtmlContent[] = [];
   const collectFromValues = (values: AttributeValue[]) => {
-    for (const v of values)
-      if (v.kind === "XHTML" && v.value) out.push(v.value);
+    for (const v of values) if (v.kind === "XHTML" && v.value) out.push(v.value);
   };
   for (const o of doc.coreContent.specObjects) collectFromValues(o.values);
   for (const s of doc.coreContent.specifications) collectFromValues(s.values);
   for (const r of doc.coreContent.specRelations) collectFromValues(r.values);
-  for (const g of doc.coreContent.specRelationGroups)
-    collectFromValues(g.values);
+  for (const g of doc.coreContent.specRelationGroups) collectFromValues(g.values);
   for (const t of doc.coreContent.specTypes) {
     for (const def of t.specAttributes) {
       if (def.kind === "XHTML" && def.defaultValue) out.push(def.defaultValue);

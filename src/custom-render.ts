@@ -36,7 +36,12 @@ export interface CustomAttributeRenderer {
    * raw attribute text yourself if you interpolate it (see `escapeHtml`).
    */
   render(value: AttributeValue | undefined, ctx: AttributeRenderContext): string | undefined;
-  /** Hide this attribute's row from the technical-details panel, since it's now shown here instead. Default: true. */
+  /**
+   * Also hide this attribute's row from the technical-details panel, since
+   * it's already shown via this custom renderer. Default: false — by
+   * default the technical panel always lists every attribute, even ones
+   * also surfaced elsewhere, for full transparency.
+   */
   hideFromTechnical?: boolean;
 }
 
@@ -89,7 +94,7 @@ export function collectHiddenDefinitionIds(
 ): Set<string> {
   const hidden = new Set<string>();
   for (const renderer of renderers ?? []) {
-    if (renderer.hideFromTechnical === false) continue;
+    if (!renderer.hideFromTechnical) continue; // default false: never hide
     const { definition } = resolveAttribute(obj, index, renderer.attribute);
     if (definition) hidden.add(definition.identifier);
   }

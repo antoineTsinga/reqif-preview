@@ -6,6 +6,7 @@ import {
   renderDocumentToHtml,
   renderPackageToHtml,
   ReqIfIndex,
+  extractLifecycleInfo,
   xhtmlToPlainText,
 } from "../src/index.js";
 import { SYNTHETIC_REQIF, TINY_PNG_BASE64 } from "./fixtures.js";
@@ -131,12 +132,38 @@ describe("synthetic fixture: ForeignID + created/modified UI", () => {
     expect(html).toContain('datetime="2024-01-10T09:00:00.000+01:00"');
   });
 
-  it("excludes the consumed lifecycle/id attributes from the technical panel", async () => {
+  it("still lists created/modified/foreignId attributes in the technical panel (never hidden)", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, { includeCss: false });
-    expect(html).not.toContain("ReqIF.ForeignID");
-    expect(html).not.toContain("ReqIF.ForeignCreatedBy");
-    expect(html).not.toContain("ReqIF.ForeignModifiedBy");
+    expect(html).toContain("ReqIF.ForeignID");
+    expect(html).toContain("ReqIF.ForeignCreatedBy");
+    expect(html).toContain("ReqIF.ForeignModifiedBy");
+  });
+
+  it("recognizes created/modified by+on even when stored as XHTML, not just STRING/DATE", async () => {
+    const doc = parseReqIfXml(`<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-XHTML IDENTIFIER="dt-x" LONG-NAME="x"/></DATATYPES>
+    <SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES>
+      <ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="a1" LONG-NAME="ForeignCreatedBy">
+        <TYPE><DATATYPE-DEFINITION-XHTML-REF>dt-x</DATATYPE-DEFINITION-XHTML-REF></TYPE>
+      </ATTRIBUTE-DEFINITION-XHTML>
+    </SPEC-ATTRIBUTES></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1"><VALUES>
+      <ATTRIBUTE-VALUE-XHTML>
+        <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>a1</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
+        <THE-VALUE><xhtml:div>susan</xhtml:div></THE-VALUE>
+      </ATTRIBUTE-VALUE-XHTML>
+    </VALUES><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE></SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS/><SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`);
+    const index = new ReqIfIndex(doc);
+    const obj = index.specObjects.get("o1")!;
+    const lifecycle = extractLifecycleInfo(obj, index);
+    expect(lifecycle.createdBy).toBe("susan");
   });
 
   it("supports a different date locale", async () => {
@@ -144,6 +171,37 @@ describe("synthetic fixture: ForeignID + created/modified UI", () => {
     const html = await renderPackageToHtml(pkg, { includeCss: false, dateLocale: "en-US" });
     // en-US medium date style renders like "Jan 10, 2024"
     expect(html).toMatch(/Jan\s+10,\s+2024/);
+  });
+  it("does not duplicate created/modified values as bare main content, even when stored as XHTML", async () => {
+    const doc = parseReqIfXml(`<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-XHTML IDENTIFIER="dt-x" LONG-NAME="x"/></DATATYPES>
+    <SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES>
+      <ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="a1" LONG-NAME="ForeignCreatedBy">
+        <TYPE><DATATYPE-DEFINITION-XHTML-REF>dt-x</DATATYPE-DEFINITION-XHTML-REF></TYPE>
+      </ATTRIBUTE-DEFINITION-XHTML>
+    </SPEC-ATTRIBUTES></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1"><VALUES>
+      <ATTRIBUTE-VALUE-XHTML>
+        <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>a1</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
+        <THE-VALUE><xhtml:div>susan</xhtml:div></THE-VALUE>
+      </ATTRIBUTE-VALUE-XHTML>
+    </VALUES><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE></SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS><SPECIFICATION IDENTIFIER="s1"><VALUES/><TYPE><SPECIFICATION-TYPE-REF>t1</SPECIFICATION-TYPE-REF></TYPE>
+      <CHILDREN><SPEC-HIERARCHY IDENTIFIER="h1"><OBJECT><SPEC-OBJECT-REF>o1</SPEC-OBJECT-REF></OBJECT><CHILDREN/></SPEC-HIERARCHY></CHILDREN>
+    </SPECIFICATION></SPECIFICATIONS>
+    <SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`);
+    const pkg = { documents: [doc], document: doc, attachments: { resolve: () => undefined, list: () => [] } };
+    const html = await renderDocumentToHtml(doc, pkg.attachments, { includeCss: false });
+    // "susan" must appear once (in the meta chip), never as a bare <div class="reqif-content">.
+    expect(html).not.toContain('<div class="reqif-content">\n                <div>susan</div>');
+    const contentMatches = html.match(/reqif-content/g) ?? [];
+    expect(contentMatches.length).toBe(0);
+    expect(html).toContain("<strong>susan</strong>");
   });
 });
 
@@ -201,19 +259,19 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     expect(html).toContain('<span class="cross-attr">Login feature</span>');
   });
 
-  it("hides the matched attribute from the technical panel by default, but can keep it with hideFromTechnical: false", async () => {
+  it("keeps the matched attribute visible in the technical panel by default, hides it only with hideFromTechnical: true", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const hidden = await renderPackageToHtml(pkg, {
+    const shown = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [{ attribute: "IE PUID", render: () => "<b>x</b>" }],
     });
-    expect(hidden).not.toContain("IE PUID");
-
-    const shown = await renderPackageToHtml(pkg, {
-      includeCss: false,
-      customAttributeRenderers: [{ attribute: "IE PUID", hideFromTechnical: false, render: () => "<b>x</b>" }],
-    });
     expect(shown).toContain("IE PUID");
+
+    const hidden = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [{ attribute: "IE PUID", hideFromTechnical: true, render: () => "<b>x</b>" }],
+    });
+    expect(hidden).not.toContain("IE PUID");
   });
 
   it("does not crash the whole render if a custom renderer throws", async () => {
