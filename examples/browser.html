@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>reqif-preview — démo navigateur</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
+    #drop { border: 2px dashed #bbb; border-radius: 10px; padding: 32px; text-align: center; color: #666; }
+    #drop.over { background: #f0f6ff; border-color: #0b62d6; }
+    #status { margin: 12px 0; color: #b00; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>reqif-preview</h1>
+  <p>Dépose un fichier <code>.reqif</code> ou <code>.reqifz</code>, ou choisis-en un — tout se passe dans le navigateur, sans serveur.</p>
+
+  <div id="drop">
+    <input type="file" id="file" accept=".reqif,.reqifz" />
+    <p>ou glisse-dépose ici</p>
+  </div>
+  <div id="status"></div>
+  <div id="preview"></div>
+
+  <!-- En usage réel : import depuis "reqif-preview" après npm install. -->
+  <script type="module">
+    import { loadReqIfPackage, renderPackageToHtml } from "../dist/index.js";
+
+    const drop = document.getElementById("drop");
+    const status = document.getElementById("status");
+    const preview = document.getElementById("preview");
+
+    async function handleFile(file) {
+      status.textContent = `Lecture de ${file.name}...`;
+      preview.innerHTML = "";
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const pkg = await loadReqIfPackage(bytes);
+        preview.innerHTML = await renderPackageToHtml(pkg);
+        status.textContent = "";
+      } catch (err) {
+        status.textContent = "Erreur : " + err.message;
+      }
+    }
+
+    document.getElementById("file").addEventListener("change", (e) => {
+      if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    ["dragover", "dragleave", "drop"].forEach((evt) =>
+      drop.addEventListener(evt, (e) => e.preventDefault()),
+    );
+    drop.addEventListener("dragover", () => drop.classList.add("over"));
+    drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+    drop.addEventListener("drop", (e) => {
+      drop.classList.remove("over");
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+  </script>
+</body>
+</html>

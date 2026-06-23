@@ -1,0 +1,138 @@
+export const SYNTHETIC_REQIF = `<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" xmlns:xhtml="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <THE-HEADER>
+    <REQ-IF-HEADER IDENTIFIER="hdr-1">
+      <COMMENT>Synthetic fixture for unit tests</COMMENT>
+      <CREATION-TIME>2024-01-15T10:00:00.000+01:00</CREATION-TIME>
+      <REQ-IF-TOOL-ID>reqif-preview-tests</REQ-IF-TOOL-ID>
+      <REQ-IF-VERSION>1.0</REQ-IF-VERSION>
+      <SOURCE-TOOL-ID>vitest</SOURCE-TOOL-ID>
+      <TITLE>Synthetic Sample</TITLE>
+    </REQ-IF-HEADER>
+  </THE-HEADER>
+  <CORE-CONTENT>
+    <REQ-IF-CONTENT>
+      <DATATYPES>
+        <DATATYPE-DEFINITION-STRING IDENTIFIER="dt-string" LONG-NAME="String" MAX-LENGTH="255"/>
+        <DATATYPE-DEFINITION-INTEGER IDENTIFIER="dt-int" LONG-NAME="Integer" MIN="0" MAX="100"/>
+        <DATATYPE-DEFINITION-REAL IDENTIFIER="dt-real" LONG-NAME="Real" MIN="0" MAX="1" ACCURACY="2"/>
+        <DATATYPE-DEFINITION-BOOLEAN IDENTIFIER="dt-bool" LONG-NAME="Boolean"/>
+        <DATATYPE-DEFINITION-DATE IDENTIFIER="dt-date" LONG-NAME="Date"/>
+        <DATATYPE-DEFINITION-XHTML IDENTIFIER="dt-xhtml" LONG-NAME="Xhtml"/>
+        <DATATYPE-DEFINITION-ENUMERATION IDENTIFIER="dt-enum" LONG-NAME="Priority">
+          <SPECIFIED-VALUES>
+            <ENUM-VALUE IDENTIFIER="ev-low" LONG-NAME="Low">
+              <PROPERTIES><EMBEDDED-VALUE KEY="1" OTHER-CONTENT="#00ff00"/></PROPERTIES>
+            </ENUM-VALUE>
+            <ENUM-VALUE IDENTIFIER="ev-high" LONG-NAME="High">
+              <PROPERTIES><EMBEDDED-VALUE KEY="2" OTHER-CONTENT="#ff0000"/></PROPERTIES>
+            </ENUM-VALUE>
+          </SPECIFIED-VALUES>
+        </DATATYPE-DEFINITION-ENUMERATION>
+      </DATATYPES>
+      <SPEC-TYPES>
+        <SPEC-OBJECT-TYPE IDENTIFIER="sot-req" LONG-NAME="Requirement">
+          <SPEC-ATTRIBUTES>
+            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="ad-name" LONG-NAME="Name" IS-EDITABLE="true">
+              <TYPE><DATATYPE-DEFINITION-STRING-REF>dt-string</DATATYPE-DEFINITION-STRING-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-STRING>
+            <ATTRIBUTE-DEFINITION-INTEGER IDENTIFIER="ad-count" LONG-NAME="Count">
+              <TYPE><DATATYPE-DEFINITION-INTEGER-REF>dt-int</DATATYPE-DEFINITION-INTEGER-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-INTEGER>
+            <ATTRIBUTE-DEFINITION-REAL IDENTIFIER="ad-ratio" LONG-NAME="Ratio">
+              <TYPE><DATATYPE-DEFINITION-REAL-REF>dt-real</DATATYPE-DEFINITION-REAL-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-REAL>
+            <ATTRIBUTE-DEFINITION-BOOLEAN IDENTIFIER="ad-active" LONG-NAME="Active">
+              <TYPE><DATATYPE-DEFINITION-BOOLEAN-REF>dt-bool</DATATYPE-DEFINITION-BOOLEAN-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-BOOLEAN>
+            <ATTRIBUTE-DEFINITION-DATE IDENTIFIER="ad-due" LONG-NAME="Due date">
+              <TYPE><DATATYPE-DEFINITION-DATE-REF>dt-date</DATATYPE-DEFINITION-DATE-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-DATE>
+            <ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="ad-desc" LONG-NAME="Description">
+              <TYPE><DATATYPE-DEFINITION-XHTML-REF>dt-xhtml</DATATYPE-DEFINITION-XHTML-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-XHTML>
+            <ATTRIBUTE-DEFINITION-ENUMERATION IDENTIFIER="ad-prio" LONG-NAME="Priority" MULTI-VALUED="false">
+              <TYPE><DATATYPE-DEFINITION-ENUMERATION-REF>dt-enum</DATATYPE-DEFINITION-ENUMERATION-REF></TYPE>
+            </ATTRIBUTE-DEFINITION-ENUMERATION>
+          </SPEC-ATTRIBUTES>
+        </SPEC-OBJECT-TYPE>
+        <SPECIFICATION-TYPE IDENTIFIER="spt-1" LONG-NAME="Spec Type">
+          <SPEC-ATTRIBUTES/>
+        </SPECIFICATION-TYPE>
+      </SPEC-TYPES>
+      <SPEC-OBJECTS>
+        <SPEC-OBJECT IDENTIFIER="so-1" LONG-NAME="Parent requirement" LAST-CHANGE="2024-01-15T10:00:00.000+01:00">
+          <VALUES>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="Login feature">
+              <DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>ad-name</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+            <ATTRIBUTE-VALUE-INTEGER THE-VALUE="42">
+              <DEFINITION><ATTRIBUTE-DEFINITION-INTEGER-REF>ad-count</ATTRIBUTE-DEFINITION-INTEGER-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-INTEGER>
+            <ATTRIBUTE-VALUE-REAL THE-VALUE="0.75">
+              <DEFINITION><ATTRIBUTE-DEFINITION-REAL-REF>ad-ratio</ATTRIBUTE-DEFINITION-REAL-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-REAL>
+            <ATTRIBUTE-VALUE-BOOLEAN THE-VALUE="true">
+              <DEFINITION><ATTRIBUTE-DEFINITION-BOOLEAN-REF>ad-active</ATTRIBUTE-DEFINITION-BOOLEAN-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-BOOLEAN>
+            <ATTRIBUTE-VALUE-DATE THE-VALUE="2024-02-01T00:00:00.000+01:00">
+              <DEFINITION><ATTRIBUTE-DEFINITION-DATE-REF>ad-due</ATTRIBUTE-DEFINITION-DATE-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-DATE>
+            <ATTRIBUTE-VALUE-XHTML>
+              <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>ad-desc</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
+              <THE-VALUE>
+                <xhtml:div>The user shall be able to <xhtml:strong>log in</xhtml:strong> with email and password.
+                <xhtml:script>alert('xss')</xhtml:script>
+                <xhtml:object data="diagram.png" type="image/png" width="64" height="64">
+                  <xhtml:object data="demo.mp3" type="audio/mpeg">
+                    Fallback alt text for <xhtml:em>the audio clip</xhtml:em>.
+                  </xhtml:object>
+                </xhtml:object>
+                <xhtml:a href="javascript:alert(1)">bad link</xhtml:a>
+                <xhtml:span style="text-decoration:underline;display:none;color:red">styled</xhtml:span>
+                </xhtml:div>
+              </THE-VALUE>
+            </ATTRIBUTE-VALUE-XHTML>
+            <ATTRIBUTE-VALUE-ENUMERATION>
+              <VALUES><ENUM-VALUE-REF>ev-high</ENUM-VALUE-REF></VALUES>
+              <DEFINITION><ATTRIBUTE-DEFINITION-ENUMERATION-REF>ad-prio</ATTRIBUTE-DEFINITION-ENUMERATION-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-ENUMERATION>
+          </VALUES>
+          <TYPE><SPEC-OBJECT-TYPE-REF>sot-req</SPEC-OBJECT-TYPE-REF></TYPE>
+        </SPEC-OBJECT>
+        <SPEC-OBJECT IDENTIFIER="so-2" LONG-NAME="Child requirement">
+          <VALUES>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="Password reset">
+              <DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>ad-name</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+          </VALUES>
+          <TYPE><SPEC-OBJECT-TYPE-REF>sot-req</SPEC-OBJECT-TYPE-REF></TYPE>
+        </SPEC-OBJECT>
+      </SPEC-OBJECTS>
+      <SPECIFICATIONS>
+        <SPECIFICATION IDENTIFIER="spec-1" LONG-NAME="Demo Specification">
+          <VALUES/>
+          <TYPE><SPECIFICATION-TYPE-REF>spt-1</SPECIFICATION-TYPE-REF></TYPE>
+          <CHILDREN>
+            <SPEC-HIERARCHY IDENTIFIER="sh-1">
+              <OBJECT><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF></OBJECT>
+              <CHILDREN>
+                <SPEC-HIERARCHY IDENTIFIER="sh-2">
+                  <OBJECT><SPEC-OBJECT-REF>so-2</SPEC-OBJECT-REF></OBJECT>
+                  <CHILDREN/>
+                </SPEC-HIERARCHY>
+              </CHILDREN>
+            </SPEC-HIERARCHY>
+          </CHILDREN>
+        </SPECIFICATION>
+      </SPECIFICATIONS>
+      <SPEC-RELATIONS/>
+      <SPEC-RELATION-GROUPS/>
+    </REQ-IF-CONTENT>
+  </CORE-CONTENT>
+</REQ-IF>
+`;
+
+// 1x1 transparent PNG, used to test attachment -> data-URI inlining.
+export const TINY_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScy8usAAAAASUVORK5CYII=";

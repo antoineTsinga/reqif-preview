@@ -1,0 +1,38 @@
+{
+  "name": "reqif-preview",
+  "version": "0.1.0",
+  "description": "Framework-independent library to parse and preview ReqIF (.reqif / .reqifz) files in the browser or Node.js",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["reqif", "reqifz", "requirements", "parser", "preview", "omg"],
+  "license": "MIT",
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
