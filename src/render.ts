@@ -1,5 +1,6 @@
 import { ReqIfIndex } from "./lookup.js";
 import { toBase64 } from "./base64.js";
+import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
 import {
   buildAttributeRenderContext,
@@ -82,6 +83,23 @@ export interface RenderOptions {
   dateLocale?: string;
   /** Inject custom content (using your own attribute(s)) before/after each object's main content. */
   customAttributeRenderers?: CustomAttributeRenderer[];
+  /**
+   * Restrict the main "content" area to these specific attributes (matched
+   * by long name or identifier), rendered in this order — each according to
+   * its own kind (XHTML sanitized, everything else as plain text). If
+   * omitted, every XHTML attribute not otherwise surfaced (id/created/
+   * modified) is shown, which isn't always what you want when an object
+   * carries several unrelated rich-text fields.
+   */
+  contentAttributes?: string[];
+  /**
+   * Extra attributes to try, in order, as a title fallback when the object
+   * has no LONG-NAME of its own (and neither does its SpecHierarchy node).
+   * The first one with a non-empty value wins — handy for tools (DOORS...)
+   * that put a meaningful label in a custom attribute (e.g. "ChapterName")
+   * instead of the structural LONG-NAME field.
+   */
+  titleAttributes?: string[];
 }
 
 const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
@@ -183,7 +201,7 @@ function renderHierarchyNode(
   const body = obj
     ? renderSpecObjectBody(obj, index, attachments, labels, options)
     : `<p class="reqif-missing">${labels.noContent}</p>`;
-  const title = escapeHtml(obj?.longName || node.longName || labels.untitled);
+  const title = escapeHtml(resolveTitle(obj, node, index, labels, options.titleAttributes));
   const childrenHtml = node.children.map((c) => renderHierarchyNode(c, index, attachments, labels, options)).join("");
 
   return (
@@ -193,6 +211,31 @@ function renderHierarchyNode(
     (childrenHtml ? `<div class="reqif-node-children">${childrenHtml}</div>` : "") +
     `</details>`
   );
+}
+
+/**
+ * Title resolution chain: the object's own LONG-NAME, then its hierarchy
+ * node's LONG-NAME, then each of `titleAttributes` in order (first non-empty
+ * value wins), then a generic "untitled" fallback.
+ */
+function resolveTitle(
+  obj: SpecObject | undefined,
+  node: SpecHierarchy,
+  index: ReqIfIndex,
+  labels: RenderLabels,
+  titleAttributes: string[] | undefined,
+): string {
+  if (obj?.longName) return obj.longName;
+  if (node.longName) return node.longName;
+  if (obj) {
+    for (const key of titleAttributes ?? []) {
+      const { value } = resolveAttribute(obj, index, key);
+      if (!value) continue;
+      const text = valueToPlainText(value, index);
+      if (text) return text;
+    }
+  }
+  return labels.untitled;
 }
 
 function renderSpecObjectBody(
@@ -232,13 +275,7 @@ function renderSimpleView(
   const before = renderCustomAttributes(options.customAttributeRenderers, "before", ctx);
   const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx);
 
-  const xhtmlValues = obj.values.filter(
-    (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } =>
-      v.kind === "XHTML" && !!v.value && !lifecycle.consumedDefinitionIds.has(v.definitionRef),
-  );
-  const contentHtml = xhtmlValues
-    .map((v) => `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`)
-    .join("");
+  const contentHtml = resolveContentHtml(obj, index, attachments, labels, lifecycle, options.contentAttributes);
 
   return (
     idHtml +
@@ -247,6 +284,48 @@ function renderSimpleView(
     (contentHtml || `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`) +
     after
   );
+}
+
+/**
+ * Resolves what goes in the main "content" area of an object:
+ * - if `contentAttributes` is given, only those attributes are shown, in that
+ *   order, each formatted according to its own kind (XHTML sanitized,
+ *   everything else as plain escaped text) — lets a consumer pick exactly
+ *   which field(s) matter instead of every XHTML attribute being dumped in;
+ * - otherwise, the previous default: every XHTML attribute not already
+ *   surfaced elsewhere (id/created/modified).
+ */
+function resolveContentHtml(
+  obj: SpecObject,
+  index: ReqIfIndex,
+  attachments: AttachmentLookup,
+  labels: RenderLabels,
+  lifecycle: ReturnType<typeof extractLifecycleInfo>,
+  contentAttributes: string[] | undefined,
+): string {
+  if (contentAttributes) {
+    const parts: string[] = [];
+    for (const key of contentAttributes) {
+      const { value } = resolveAttribute(obj, index, key);
+      if (!value) continue;
+      const html =
+        value.kind === "XHTML"
+          ? value.value
+            ? renderXhtmlContent(value.value, { attachments })
+            : ""
+          : renderAttributeValue(value, index, attachments, labels);
+      if (html) parts.push(`<div class="reqif-content">${html}</div>`);
+    }
+    return parts.join("");
+  }
+
+  const xhtmlValues = obj.values.filter(
+    (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } =>
+      v.kind === "XHTML" && !!v.value && !lifecycle.consumedDefinitionIds.has(v.definitionRef),
+  );
+  return xhtmlValues
+    .map((v) => `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`)
+    .join("");
 }
 
 /** Renders a single, unambiguous "Créé par X · date — Modifié par Y · date" line. */

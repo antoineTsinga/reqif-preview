@@ -8,7 +8,7 @@ export {
   type ReqIfInput,
 } from "./load-package.js";
 export { ReqIfIndex } from "./lookup.js";
-export { resolveAttribute, normalizeKey } from "./attribute-lookup.js";
+export { resolveAttribute, normalizeKey, valueToPlainText } from "./attribute-lookup.js";
 export { extractLifecycleInfo, type LifecycleInfo } from "./lifecycle.js";
 export type { AttributeRenderContext, CustomAttributeRenderer } from "./custom-render.js";
 export {

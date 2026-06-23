@@ -5,6 +5,7 @@ import {
   parseReqIfXml,
   renderDocumentToHtml,
   renderPackageToHtml,
+  renderSpecification,
   ReqIfIndex,
   extractLifecycleInfo,
   xhtmlToPlainText,
@@ -301,6 +302,77 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     // so-2 has no "IE PUID" value, so its badge must not appear at all near its block.
     const so2Index = html.indexOf("Password reset");
     expect(so2Index).toBeGreaterThan(-1);
+  });
+});
+
+describe("synthetic fixture: contentAttributes (user-controlled content)", () => {
+  it("by default shows every XHTML attribute not already surfaced elsewhere", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).toContain("The user shall be able to");
+  });
+
+  it("restricts content to only the listed attribute(s), in the given order", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      contentAttributes: ["Name"], // a plain STRING attribute, not XHTML
+    });
+    expect(html).toContain('<div class="reqif-content">Login feature</div>');
+    // it's still fine for "Description" to appear in the always-exhaustive
+    // technical panel — the exact match above already proves contentAttributes
+    // correctly restricted what shows up as *content* for this object.
+  });
+
+  it("renders non-XHTML attributes as plain escaped text", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, contentAttributes: ["Count"] });
+    expect(html).toContain('<div class="reqif-content">42</div>');
+  });
+
+  it("falls back to the empty placeholder when none of the listed attributes are present", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, contentAttributes: ["Does not exist"] });
+    expect(html).toContain("(vide)");
+  });
+});
+
+describe("synthetic fixture: titleAttributes (user-controlled title fallback)", () => {
+  it("still prefers the object's own LONG-NAME when present", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, titleAttributes: ["Name"] });
+    expect(html).toContain(">Parent requirement<"); // so-1's LONG-NAME, not its "Name" attribute value
+  });
+
+  it("falls back to the first non-empty attribute in titleAttributes when LONG-NAME is missing", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    // Strip the LONG-NAME from so-1 and its hierarchy node to force the fallback chain.
+    doc.coreContent.specObjects[0].longName = undefined;
+    doc.coreContent.specifications[0].children[0].longName = undefined;
+    const index = new ReqIfIndex(doc);
+    const html = await renderSpecification(
+      doc.coreContent.specifications[0],
+      index,
+      { get: () => undefined },
+      undefined,
+      { includeCss: false, titleAttributes: ["Does not exist", "Name"] },
+    );
+    expect(html).toContain(">Login feature<"); // resolved via the "Name" attribute
+  });
+
+  it("falls back to the untitled label when nothing matches", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[0].longName = undefined;
+    doc.coreContent.specifications[0].children[0].longName = undefined;
+    const index = new ReqIfIndex(doc);
+    const html = await renderSpecification(
+      doc.coreContent.specifications[0],
+      index,
+      { get: () => undefined },
+      undefined,
+      { includeCss: false, titleAttributes: ["Does not exist"] },
+    );
+    expect(html).toContain("(sans titre)");
   });
 });
 

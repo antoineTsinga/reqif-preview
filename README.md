@@ -52,6 +52,27 @@ const html = await renderPackageToHtml(pkg, {
 });
 ```
 
+### Choisir précisément le titre et le contenu affichés
+
+Par défaut, le **titre** vient du `LONG-NAME` de l'objet (ou de son nœud dans l'arborescence), et le **contenu** affiche automatiquement tous les attributs XHTML de l'objet — ce qui n'est pas toujours pertinent si plusieurs champs riches coexistent sans rapport entre eux. Deux options permettent de reprendre la main :
+
+```ts
+const html = await renderPackageToHtml(pkg, {
+  // Seuls ces attributs (dans cet ordre) constituent le contenu principal.
+  // Chacun est rendu selon son propre type (XHTML assaini, le reste en texte échappé).
+  // Si omis : comportement par défaut (tous les attributs XHTML non déjà affichés ailleurs).
+  contentAttributes: ["ReqIF.Text"],
+
+  // Si l'objet (et son nœud) n'ont pas de LONG-NAME, on essaie ces attributs
+  // dans l'ordre — le premier non vide devient le titre.
+  titleAttributes: ["ReqIF.ChapterName", "ReqIF.Name"],
+});
+```
+
+- `contentAttributes` : liste blanche stricte — si un attribut listé n'existe pas sur l'objet, il est simplement ignoré ; si aucun n'a de valeur, le message "(vide)" habituel s'affiche.
+- `titleAttributes` : n'intervient qu'en dernier recours, après le `LONG-NAME` de l'objet et celui de son nœud d'arborescence (jamais à leur place) — pratique pour les exports DOORS où le vrai libellé est parfois dans un attribut personnalisé plutôt que dans le champ structurel.
+- Dans les deux cas, les attributs visés restent aussi visibles dans le panneau technique (qui, lui, n'est jamais filtré).
+
 ### Afficher un contenu personnalisé (ex. un ID métier comme PUID)
 
 `ReqIF.ForeignID` couvre le cas standard, mais beaucoup d'outils stockent leur identifiant métier dans un attribut au nom libre (ex. `IE PUID` chez DOORS, parfois en XHTML plutôt qu'en chaîne simple). Pour ces cas, enregistrez un **rendu personnalisable** : la fonction reçoit la valeur déjà résolue de l'attribut ciblé, plus un contexte qui donne accès à *tous* les autres attributs de l'objet (pour croiser plusieurs valeurs si besoin), et son HTML est injecté juste avant ou juste après le texte principal, au choix :

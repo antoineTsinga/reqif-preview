@@ -1,4 +1,5 @@
 import { ReqIfIndex } from "./lookup.js";
+import { xhtmlToPlainText } from "./sanitize.js";
 import type { AttributeDefinition, AttributeValue, SpecObject } from "./types.js";
 
 /** Lowercases and strips everything but letters/digits, so "ReqIF.ForeignID",
@@ -28,4 +29,38 @@ export function resolveAttribute(obj: SpecObject, index: ReqIfIndex, nameOrId: s
     }
   }
   return {};
+}
+
+function asString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const s = String(value).trim();
+  return s.length ? s : undefined;
+}
+
+/**
+ * Extracts a plain-text reading of a value regardless of its concrete kind —
+ * used wherever an attribute might serve as a title or as fallback content,
+ * since real-world exports are inconsistent about which datatype they use
+ * for a given semantic role (e.g. DOORS sometimes stores a short label as
+ * XHTML rather than STRING).
+ */
+export function valueToPlainText(value: AttributeValue, index?: ReqIfIndex): string | undefined {
+  switch (value.kind) {
+    case "STRING":
+    case "DATE":
+      return asString(value.value);
+    case "INTEGER":
+    case "REAL":
+      return value.value === undefined ? undefined : String(value.value);
+    case "BOOLEAN":
+      return value.value === undefined ? undefined : value.value ? "true" : "false";
+    case "XHTML":
+      return value.value ? asString(xhtmlToPlainText(value.value)) : undefined;
+    case "ENUMERATION": {
+      const labels = index ? index.enumLabels(value.valueRefs) : value.valueRefs;
+      return labels.length ? labels.join(", ") : undefined;
+    }
+    default:
+      return undefined;
+  }
 }
