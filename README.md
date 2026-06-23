@@ -28,14 +28,18 @@ C'est tout pour le cas simple : `loadReqIfPackage` détecte automatiquement si l
 
 Pour chaque exigence, seuls trois éléments sont affichés sans action de l'utilisateur :
 - le **titre** (résumé cliquable de l'arborescence) ;
-- l'**ID** (`IDENTIFIER` ReqIF de l'objet) ;
-- le **texte enrichi** (contenu des attributs de type XHTML — la description/le corps de l'exigence).
+- l'**ID** — `ReqIF.ForeignID` (ou équivalent : "Foreign ID", "ForeignID") si le document en fournit un, sinon l'identifiant GUID interne en repli ;
+- le **texte enrichi** (contenu des attributs de type XHTML — la description/le corps de l'exigence) ;
+- une ligne **« Créé par X · date — Modifié par Y · date »**, clairement étiquetée, si le document fournit ces informations (convention `ReqIF.ForeignCreatedBy/On` et `ReqIF.ForeignModifiedBy/On`, utilisée par DOORS, DOORS Next, ReqEdit, ReqView...). Si modification = création, la ligne "Modifié" n'est pas dupliquée.
 
-Tous les autres attributs (chaînes, nombres, dates, énumérations, booléens...) sont regroupés dans un panneau **« Détails techniques »**, replié par défaut, qu'on déplie d'un clic (un `<details>/<summary>` natif — aucun JavaScript requis) :
+Tous les autres attributs (chaînes, nombres, dates, énumérations, booléens...) sont regroupés dans un panneau **« Détails techniques »**, replié par défaut, qu'on déplie d'un clic (un `<details>/<summary>` natif — aucun JavaScript requis). Les attributs déjà affichés ailleurs (ID, créé/modifié) n'y sont pas dupliqués.
 
 ```ts
 // Replié par défaut. Pour l'afficher déplié d'entrée :
 const html = await renderPackageToHtml(pkg, { showTechnicalByDefault: true });
+
+// Locale utilisée pour formater les dates créé/modifié (par défaut "fr-FR") :
+const html = await renderPackageToHtml(pkg, { dateLocale: "en-US" });
 ```
 
 Les libellés sont en français par défaut et personnalisables :
@@ -45,6 +49,39 @@ const html = await renderPackageToHtml(pkg, {
   labels: { technicalDetails: "Technical details", yes: "Yes", no: "No" },
 });
 ```
+
+### Afficher un contenu personnalisé (ex. un ID métier comme PUID)
+
+`ReqIF.ForeignID` couvre le cas standard, mais beaucoup d'outils stockent leur identifiant métier dans un attribut au nom libre (ex. `IE PUID` chez DOORS, parfois en XHTML plutôt qu'en chaîne simple). Pour ces cas, enregistrez un **rendu personnalisable** : la fonction reçoit la valeur déjà résolue de l'attribut ciblé, plus un contexte qui donne accès à *tous* les autres attributs de l'objet (pour croiser plusieurs valeurs si besoin), et son HTML est injecté juste avant ou juste après le texte principal, au choix :
+
+```ts
+import { renderPackageToHtml, xhtmlToPlainText } from "reqif-preview";
+
+const html = await renderPackageToHtml(pkg, {
+  customAttributeRenderers: [
+    {
+      attribute: "IE PUID", // nom long (ou identifiant) de l'attribut visé
+      position: "before",   // "before" (défaut) ou "after"
+      render: (value, ctx) => {
+        if (!value) return undefined; // rien à afficher pour cet objet -> on ne touche à rien
+        const text = value.kind === "XHTML" && value.value
+          ? xhtmlToPlainText(value.value)
+          : value.kind === "STRING" ? value.value : undefined;
+        return text
+          ? `<span class="puid-badge">${text}</span>` // pensez à échapper vos propres textes
+          : undefined;
+      },
+    },
+  ],
+});
+```
+
+- `value` est `undefined` si l'objet ne porte pas cet attribut — retournez `undefined` pour ne rien afficher.
+- `ctx.getValue("Autre attribut")` / `ctx.getDefinition(...)` permettent de lire d'autres attributs de l'objet.
+- `ctx.formatValue(value)` réutilise le même formatage que le panneau technique (résolution des libellés d'énumération, rendu XHTML assaini...).
+- Par défaut, l'attribut ciblé est masqué du panneau technique (déjà affiché via le rendu personnalisé) ; passez `hideFromTechnical: false` pour le garder aussi là-bas.
+- Une exception levée dans `render()` est interceptée : elle n'interrompt jamais le rendu du reste du document.
+- Le HTML retourné est inséré tel quel (ce n'est pas du contenu du document ReqIF, mais du code que *vous* écrivez) — échappez vous-même tout texte brut interpolé, par exemple avec `escapeHtml` exporté par la lib.
 
 ### Dans le navigateur, depuis un `<input type="file">`
 

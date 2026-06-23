@@ -1,5 +1,13 @@
 import { ReqIfIndex } from "./lookup.js";
 import { toBase64 } from "./base64.js";
+import { extractLifecycleInfo } from "./lifecycle.js";
+import {
+  buildAttributeRenderContext,
+  collectHiddenDefinitionIds,
+  renderCustomAttributes,
+  type AttributeRenderContext,
+  type CustomAttributeRenderer,
+} from "./custom-render.js";
 import {
   AttachmentLookup,
   collectReferencedPaths,
@@ -14,9 +22,12 @@ import type {
   ReqIfPackage,
   SpecHierarchy,
   SpecObject,
+  SpecType,
   Specification,
   XhtmlContent,
 } from "./types.js";
+
+export type { AttributeRenderContext, CustomAttributeRenderer };
 
 export interface RenderLabels {
   noContent: string;
@@ -30,6 +41,10 @@ export interface RenderLabels {
   headerComment: string;
   yes: string;
   no: string;
+  createdByLabel: string;
+  createdOnLabel: string;
+  modifiedByLabel: string;
+  modifiedOnLabel: string;
 }
 
 const DEFAULT_LABELS: RenderLabels = {
@@ -44,6 +59,10 @@ const DEFAULT_LABELS: RenderLabels = {
   headerComment: "Commentaire",
   yes: "Oui",
   no: "Non",
+  createdByLabel: "Créé par",
+  createdOnLabel: "Créé le",
+  modifiedByLabel: "Modifié par",
+  modifiedOnLabel: "Modifié le",
 };
 
 export interface RenderOptions {
@@ -59,17 +78,27 @@ export interface RenderOptions {
   showTechnicalByDefault?: boolean;
   /** Max bytes read per attachment before it's left unresolved instead of inlined. Default: 5MB. */
   maxInlineBytes?: number;
+  /** Locale used to format the created/modified dates. Default: "fr-FR". */
+  dateLocale?: string;
+  /** Inject custom content (using your own attribute(s)) before/after each object's main content. */
+  customAttributeRenderers?: CustomAttributeRenderer[];
 }
 
 const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
 
 /** Renders every document found in a package (a .reqifz may contain several). */
-export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOptions = {}): Promise<string> {
+export async function renderPackageToHtml(
+  pkg: ReqIfPackage,
+  options: RenderOptions = {},
+): Promise<string> {
   const attachments = options.attachments ?? pkg.attachments;
   const parts = await Promise.all(
-    pkg.documents.map((doc) => renderDocumentToHtml(doc, attachments, { ...options, includeCss: false })),
+    pkg.documents.map((doc) =>
+      renderDocumentToHtml(doc, attachments, { ...options, includeCss: false }),
+    ),
   );
-  const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
+  const css =
+    options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
   return `${css}<div class="reqif-preview">${parts.join("")}</div>`;
 }
 
@@ -81,14 +110,19 @@ export async function renderDocumentToHtml(
 ): Promise<string> {
   const labels: RenderLabels = { ...DEFAULT_LABELS, ...options.labels };
   const index = new ReqIfIndex(doc);
-  const lookup = await buildAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
+  const lookup = await buildAttachmentLookup(
+    doc,
+    attachments,
+    options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES,
+  );
 
   const header = renderHeader(doc, labels);
   const specs = doc.coreContent.specifications
     .map((spec) => renderSpecification(spec, index, lookup, labels, options))
     .join("");
 
-  const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
+  const css =
+    options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
   return `${css}<div class="reqif-preview">${header}<div class="reqif-specs">${specs}</div></div>`;
 }
 
@@ -101,7 +135,9 @@ export function renderSpecification(
   options: RenderOptions = {},
 ): string {
   const title = escapeHtml(spec.longName || labels.untitled);
-  const nodes = spec.children.map((n) => renderHierarchyNode(n, index, attachments, labels, options)).join("");
+  const nodes = spec.children
+    .map((n) => renderHierarchyNode(n, index, attachments, labels, options))
+    .join("");
   return `<section class="reqif-spec"><h2 class="reqif-spec-title">${title}</h2><div class="reqif-tree">${nodes}</div></section>`;
 }
 
@@ -109,8 +145,25 @@ export function renderSpecification(
 // Internals
 // ---------------------------------------------------------------------------
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s).replace(/"/g, "&quot;");
+}
+
+/** Formats an ISO date/datetime for display; falls back to the raw string if it can't be parsed. */
+function formatDate(iso: string, locale: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+    } as Intl.DateTimeFormatOptions).format(d);
+  } catch {
+    return iso;
+  }
 }
 
 function renderHeader(doc: ReqIfDocument, labels: RenderLabels): string {
@@ -146,13 +199,17 @@ function renderHierarchyNode(
     ? renderSpecObjectBody(obj, index, attachments, labels, options)
     : `<p class="reqif-missing">${labels.noContent}</p>`;
   const title = escapeHtml(obj?.longName || node.longName || labels.untitled);
-  const childrenHtml = node.children.map((c) => renderHierarchyNode(c, index, attachments, labels, options)).join("");
+  const childrenHtml = node.children
+    .map((c) => renderHierarchyNode(c, index, attachments, labels, options))
+    .join("");
 
   return (
     `<details class="reqif-node" open>` +
     `<summary class="reqif-node-title">${title}</summary>` +
     `<div class="reqif-node-body">${body}</div>` +
-    (childrenHtml ? `<div class="reqif-node-children">${childrenHtml}</div>` : "") +
+    (childrenHtml
+      ? `<div class="reqif-node-children">${childrenHtml}</div>`
+      : "") +
     `</details>`
   );
 }
@@ -164,48 +221,189 @@ function renderSpecObjectBody(
   labels: RenderLabels,
   options: RenderOptions,
 ): string {
-  const simple = renderSimpleView(obj, attachments, labels);
-  const technical = renderTechnicalPanel(obj, index, attachments, labels, options);
+  const specType = index.specTypes.get(obj.typeRef);
+  const lifecycle = extractLifecycleInfo(obj, index);
+  const dateLocale = options.dateLocale ?? "fr-FR";
+
+  const simple = renderSimpleView(
+    obj,
+    specType,
+    index,
+    attachments,
+    labels,
+    options,
+    lifecycle,
+    dateLocale,
+  );
+  const technical = renderTechnicalPanel(
+    obj,
+    specType,
+    index,
+    attachments,
+    labels,
+    options,
+    lifecycle,
+  );
   return `<div class="reqif-simple">${simple}</div>${technical}`;
 }
 
-/** The "friendly" view: just the object's id and its rich-text (XHTML) content. */
-function renderSimpleView(obj: SpecObject, attachments: AttachmentLookup, labels: RenderLabels): string {
-  const idHtml = `<div class="reqif-id">${escapeHtml(labels.idLabel)}: <code>${escapeHtml(obj.identifier)}</code></div>`;
-  const xhtmlValues = obj.values.filter(
-    (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } => v.kind === "XHTML" && !!v.value,
-  );
-  const contentHtml = xhtmlValues
-    .map((v) => `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`)
-    .join("");
-  return idHtml + (contentHtml || `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`);
-}
-
-/** The "technical" view: every attribute, in the SpecObjectType's declared order — hidden behind a toggle. */
-function renderTechnicalPanel(
+/** The "friendly" view: id, a clear created/modified line, custom slots, then the rich-text content. */
+function renderSimpleView(
   obj: SpecObject,
+  specType: SpecType | undefined,
   index: ReqIfIndex,
   attachments: AttachmentLookup,
   labels: RenderLabels,
   options: RenderOptions,
+  lifecycle: ReturnType<typeof extractLifecycleInfo>,
+  dateLocale: string,
 ): string {
-  const specType = index.specTypes.get(obj.typeRef);
+  const displayId = lifecycle.foreignId ?? obj.identifier;
+  const idHtml = `<div class="reqif-id">${escapeHtml(labels.idLabel)}: <code>${escapeHtml(displayId)}</code></div>`;
+  const metaHtml = renderLifecycleMeta(lifecycle, labels, dateLocale);
+
+  const formatValue = (value: AttributeValue | undefined) =>
+    value ? renderAttributeValue(value, index, attachments, labels) : "";
+  const ctx = buildAttributeRenderContext(
+    obj,
+    specType,
+    index,
+    attachments,
+    formatValue,
+  );
+  const before = renderCustomAttributes(
+    options.customAttributeRenderers,
+    "before",
+    ctx,
+  );
+  const after = renderCustomAttributes(
+    options.customAttributeRenderers,
+    "after",
+    ctx,
+  );
+
+  const xhtmlValues = obj.values.filter(
+    (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } =>
+      v.kind === "XHTML" && !!v.value,
+  );
+  const contentHtml = xhtmlValues
+    .map(
+      (v) =>
+        `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`,
+    )
+    .join("");
+
+  return (
+    idHtml +
+    metaHtml +
+    before +
+    (contentHtml ||
+      `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`) +
+    after
+  );
+}
+
+/** Renders a single, unambiguous "Créé par X · date — Modifié par Y · date" line. */
+function renderLifecycleMeta(
+  lifecycle: ReturnType<typeof extractLifecycleInfo>,
+  labels: RenderLabels,
+  dateLocale: string,
+): string {
+  const createdChip = lifecycleChip(
+    lifecycle.createdBy,
+    lifecycle.createdOn,
+    labels.createdByLabel,
+    labels.createdOnLabel,
+    dateLocale,
+  );
+
+  const isSameAsCreated =
+    lifecycle.modifiedBy === lifecycle.createdBy &&
+    lifecycle.modifiedOn === lifecycle.createdOn;
+  const modifiedChip = isSameAsCreated
+    ? undefined
+    : lifecycleChip(
+        lifecycle.modifiedBy,
+        lifecycle.modifiedOn,
+        labels.modifiedByLabel,
+        labels.modifiedOnLabel,
+        dateLocale,
+      );
+
+  const chips = [createdChip, modifiedChip].filter((c): c is string => !!c);
+  if (chips.length === 0) return "";
+  return `<div class="reqif-meta-strip">${chips.join("")}</div>`;
+}
+
+function lifecycleChip(
+  by: string | undefined,
+  on: string | undefined,
+  byLabel: string,
+  onLabel: string,
+  dateLocale: string,
+): string | undefined {
+  console.log("lifecycleChip", { by, on, byLabel, onLabel, dateLocale });
+  if (!by && !on) return undefined;
+  const role = by ? byLabel : onLabel;
+  const bits = [`<span class="reqif-meta-role">${escapeHtml(role)}</span>`];
+  if (by) bits.push(`<strong>${escapeHtml(by)}</strong>`);
+  if (on)
+    bits.push(
+      `<time datetime="${escapeAttr(on)}">${escapeHtml(formatDate(on, dateLocale))}</time>`,
+    );
+  return `<span class="reqif-meta-chip">${bits.join(" ")}</span>`;
+}
+
+/** The "technical" view: every other attribute, in the SpecObjectType's declared order — hidden behind a toggle. */
+function renderTechnicalPanel(
+  obj: SpecObject,
+  specType: SpecType | undefined,
+  index: ReqIfIndex,
+  attachments: AttachmentLookup,
+  labels: RenderLabels,
+  options: RenderOptions,
+  lifecycle: ReturnType<typeof extractLifecycleInfo>,
+): string {
   const orderedDefs = specType ? specType.specAttributes : [];
   const byDefId = new Map(obj.values.map((v) => [v.definitionRef, v]));
 
-  // Preserve the SpecObjectType's declared attribute order; append any value
-  // whose definition wasn't found in the type (malformed but recoverable).
+  // Attributes already surfaced elsewhere (id badge, created/modified line,
+  // custom renderers) are excluded here so nothing is shown twice without context.
+  const hidden = new Set(lifecycle.consumedDefinitionIds);
+  for (const id of collectHiddenDefinitionIds(
+    options.customAttributeRenderers,
+    obj,
+    index,
+  ))
+    hidden.add(id);
+
   const seen = new Set<string>();
   const rows: string[] = [];
   for (const def of orderedDefs) {
-    const value = byDefId.get(def.identifier);
     seen.add(def.identifier);
-    const html = renderAttributeRow(def, value, index, attachments, labels, options);
+    if (hidden.has(def.identifier)) continue;
+    const value = byDefId.get(def.identifier);
+    const html = renderAttributeRow(
+      def,
+      value,
+      index,
+      attachments,
+      labels,
+      options,
+    );
     if (html) rows.push(html);
   }
   for (const value of obj.values) {
-    if (seen.has(value.definitionRef)) continue;
-    const html = renderAttributeRow(undefined, value, index, attachments, labels, options);
+    if (seen.has(value.definitionRef) || hidden.has(value.definitionRef))
+      continue;
+    const html = renderAttributeRow(
+      undefined,
+      value,
+      index,
+      attachments,
+      labels,
+      options,
+    );
     if (html) rows.push(html);
   }
 
@@ -228,7 +426,9 @@ function renderAttributeRow(
   options: RenderOptions,
 ): string | undefined {
   const name = def?.longName ?? value?.definitionRef ?? "?";
-  const html = value ? renderAttributeValue(value, index, attachments, labels) : "";
+  const html = value
+    ? renderAttributeValue(value, index, attachments, labels)
+    : "";
   if (!html && options.hideEmptyAttributes !== false) return undefined;
   return (
     `<div class="reqif-attr">` +
@@ -246,7 +446,11 @@ function renderAttributeValue(
 ): string {
   switch (value.kind) {
     case "BOOLEAN":
-      return value.value === undefined ? "" : value.value ? labels.yes : labels.no;
+      return value.value === undefined
+        ? ""
+        : value.value
+          ? labels.yes
+          : labels.no;
     case "DATE":
       return value.value ? escapeHtml(value.value) : "";
     case "INTEGER":
@@ -257,7 +461,9 @@ function renderAttributeValue(
     case "ENUMERATION":
       return index.enumLabels(value.valueRefs).map(escapeHtml).join(", ");
     case "XHTML":
-      return value.value ? renderXhtmlContent(value.value, { attachments }) : "";
+      return value.value
+        ? renderXhtmlContent(value.value, { attachments })
+        : "";
     default:
       return "";
   }
@@ -274,7 +480,8 @@ async function buildAttachmentLookup(
   maxInlineBytes: number,
 ): Promise<AttachmentLookup> {
   const paths = new Set<string>();
-  for (const content of collectAllXhtmlContents(doc)) collectReferencedPaths(content, paths);
+  for (const content of collectAllXhtmlContents(doc))
+    collectReferencedPaths(content, paths);
 
   const resolved = new Map<string, { href: string; mimeType?: string }>();
   await Promise.all(
@@ -284,7 +491,10 @@ async function buildAttachmentLookup(
       if (attachment.size > maxInlineBytes) return; // too big to inline; left unresolved on purpose
       const bytes = await attachment.getBytes();
       const mimeType = attachment.mimeType ?? "application/octet-stream";
-      resolved.set(path, { href: `data:${mimeType};base64,${toBase64(bytes)}`, mimeType });
+      resolved.set(path, {
+        href: `data:${mimeType};base64,${toBase64(bytes)}`,
+        mimeType,
+      });
     }),
   );
 
@@ -294,12 +504,14 @@ async function buildAttachmentLookup(
 function collectAllXhtmlContents(doc: ReqIfDocument): XhtmlContent[] {
   const out: XhtmlContent[] = [];
   const collectFromValues = (values: AttributeValue[]) => {
-    for (const v of values) if (v.kind === "XHTML" && v.value) out.push(v.value);
+    for (const v of values)
+      if (v.kind === "XHTML" && v.value) out.push(v.value);
   };
   for (const o of doc.coreContent.specObjects) collectFromValues(o.values);
   for (const s of doc.coreContent.specifications) collectFromValues(s.values);
   for (const r of doc.coreContent.specRelations) collectFromValues(r.values);
-  for (const g of doc.coreContent.specRelationGroups) collectFromValues(g.values);
+  for (const g of doc.coreContent.specRelationGroups)
+    collectFromValues(g.values);
   for (const t of doc.coreContent.specTypes) {
     for (const def of t.specAttributes) {
       if (def.kind === "XHTML" && def.defaultValue) out.push(def.defaultValue);
@@ -347,4 +559,9 @@ const DEFAULT_CSS = `
 .reqif-technical-toggle:hover { background: #e6e6e6; }
 .reqif-technical[open] > .reqif-technical-toggle { background: #e0ebfb; border-color: #b6d0f5; }
 .reqif-technical .reqif-attrs { margin-top: 10px; }
+.reqif-meta-strip { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.reqif-meta-chip { display: inline-flex; align-items: center; gap: 4px; background: #f5f5f5; border-radius: 6px; padding: 2px 8px; color: #444; }
+.reqif-meta-role { color: #888; }
+.reqif-meta-chip time { color: #666; }
+.reqif-custom-attr { font-size: 14px; }
 `;
