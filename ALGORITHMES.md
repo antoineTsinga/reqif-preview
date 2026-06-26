@@ -110,6 +110,10 @@ REQ-IF › CORE-CONTENT › REQ-IF-CONTENT › SPECIFICATIONS › SPECIFICATION
 
 … auquel s'ajoute la profondeur du contenu XHTML lui-même (texte collé depuis Word, souvent imbriqué `div > div > span > span`). `parse-document.ts` relève cette limite à **10 000**, configurable via `ParseOptions.maxNestedTags` (passé directement à `new XMLParser({ ...options, maxNestedTags })`).
 
+### Le garde-fou `processEntities` (entités XML)
+
+Le même type de package applique une protection analogue côté **entités** (`&amp;`, `&quot;`, déclarations `<!ENTITY>` dans un `<!DOCTYPE>`) : un compteur global, incrémenté à chaque entité traitée sur tout le document, déclenche une erreur (`Entity count exceeds maximum allowed` / `Entity expansion limit exceeded` selon la version) une fois un seuil de l'ordre de **1000** dépassé. Un grand export réel contenant simplement beaucoup de `&`/guillemets dans son texte (très commun : "Terms & Conditions", "R&D"...) peut dépasser ce seuil sans qu'il y ait quoi que ce soit de malveillant dans le fichier. `parse-document.ts` reconfigure explicitement `processEntities` avec des limites généreuses pour chacun de ses sous-réglages (`maxEntitySize`, `maxExpansionDepth`, `maxTotalExpansions`, `maxExpandedLength`, `maxEntityCount`), plutôt que de laisser fast-xml-parser appliquer ses valeurs implicites — la même philosophie que pour `maxNestedTags`, et configurable de la même façon via `ParseOptions.processEntities`.
+
 ---
 
 ## 3. Construction du modèle de données

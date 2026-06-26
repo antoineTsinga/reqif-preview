@@ -37,6 +37,26 @@ import type {
 
 const DEFAULT_MAX_NESTED_TAGS = 10_000;
 
+const DEFAULT_PROCESS_ENTITIES = {
+  enabled: true,
+  // fast-xml-parser's own anti-"XML bomb" defaults here (maxTotalExpansions /
+  // maxEntityCount both effectively 1000 in current releases) are far too
+  // low for a real ReqIF export: a sizeable document can easily contain
+  // more than 1000 ordinary entity references (&amp;, &quot;, ...) spread
+  // across hundreds of requirements, or a tool-generated DOCTYPE with many
+  // named entities — throwing "Entity count exceeds maximum allowed" (or
+  // "Entity expansion limit exceeded", depending on the exact release) on
+  // an otherwise perfectly legitimate file.
+  maxEntitySize: 1_000_000,
+  maxExpansionDepth: 10_000,
+  maxTotalExpansions: 1_000_000,
+  maxExpandedLength: 10_000_000,
+  maxEntityCount: 1_000_000,
+  allowedTags: null,
+  tagFilter: null,
+  appliesTo: "all",
+} as const;
+
 const BASE_PARSER_OPTIONS = {
   preserveOrder: true,
   ignoreAttributes: false,
@@ -63,6 +83,22 @@ export interface ParseOptions {
    * pathological input; raise it further for unusually deep documents.
    */
   maxNestedTags?: number;
+  /**
+   * Same idea, for fast-xml-parser's separate entity-processing guards
+   * (total entity expansions / entity count / expanded length) — its
+   * defaults throw on documents with as few as ~1000 entity references or
+   * declarations (`Entity count exceeds maximum allowed` / `Entity
+   * expansion limit exceeded`), which a real ReqIF export can exceed simply
+   * by having many `&amp;`/`&quot;`-containing requirements. Pass a partial
+   * object to override only the limits you care about; pass `false` to
+   * disable entity processing entirely (rarely what you want).
+   */
+  processEntities?: Partial<typeof DEFAULT_PROCESS_ENTITIES> | false;
+}
+
+function buildProcessEntities(override: ParseOptions["processEntities"]): unknown {
+  if (override === false) return false;
+  return { ...DEFAULT_PROCESS_ENTITIES, ...override };
 }
 
 /** Parses a single ReqIF XML document (the content of one `.reqif` file). */
@@ -72,6 +108,7 @@ export function parseReqIfXml(xml: string, options: ParseOptions = {}): ReqIfDoc
     const parser = new XMLParser({
       ...BASE_PARSER_OPTIONS,
       maxNestedTags: options.maxNestedTags ?? DEFAULT_MAX_NESTED_TAGS,
+      processEntities: buildProcessEntities(options.processEntities),
     } as any);
     roots = parser.parse(xml) as XNode[];
   } catch (err) {

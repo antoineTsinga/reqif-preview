@@ -196,6 +196,17 @@ const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 50_000 });
 const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 200 });
 ```
 
+`fast-xml-parser` applique le même type de garde-fou pour le traitement des entités XML (`&amp;`, `&quot;`, déclarations `<!ENTITY>`...) : selon la version, la limite par défaut tourne autour de **1000** occurrences/déclarations au total dans le document — facilement dépassé par un export volumineux contenant beaucoup de `&`/guillemets dans son texte, avec une erreur du type `Entity count exceeds maximum allowed` ou `Entity expansion limit exceeded`. `reqif-preview` relève également ces limites par défaut. Pour les ajuster :
+
+```ts
+const pkg = await loadReqIfPackage(bytes, {
+  processEntities: { maxEntityCount: 5_000_000, maxTotalExpansions: 5_000_000 },
+});
+
+// Désactiver entièrement le traitement des entités (rarement utile) :
+const pkg = await loadReqIfPackage(bytes, { processEntities: false });
+```
+
 ## Sécurité
 
 Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'un tiers. `renderXhtmlContent` applique une liste blanche stricte de balises/attributs (alignée sur les modules XHTML autorisés par la spec : Text, List, Hypertext, Edit, Presentation, Basic Tables, Object, Style Attribute) :

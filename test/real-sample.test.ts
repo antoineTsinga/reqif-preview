@@ -50,6 +50,60 @@ describe("deeply nested documents (fast-xml-parser maxNestedTags)", () => {
   });
 });
 
+describe("documents with many entities (fast-xml-parser processEntities guards)", () => {
+  function docWithDoctypeEntities(count: number): string {
+    let ents = "";
+    for (let i = 0; i < count; i++) ents += `<!ENTITY e${i} "val${i}">\n`;
+    return `<?xml version="1.0"?>
+<!DOCTYPE REQ-IF [
+${ents}
+]>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES/><SPEC-TYPES/><SPEC-OBJECTS/><SPECIFICATIONS/><SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+  }
+
+  function docWithManyAmpersands(count: number): string {
+    let values = "";
+    for (let i = 0; i < count; i++) {
+      values += `<ATTRIBUTE-VALUE-STRING THE-VALUE="Terms &amp; Conditions ${i} &quot;quoted&quot;"><DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>ad1</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION></ATTRIBUTE-VALUE-STRING>`;
+    }
+    return `<?xml version="1.0"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-STRING IDENTIFIER="dt1" LONG-NAME="s"/></DATATYPES>
+    <SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES>
+      <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="ad1" LONG-NAME="A"><TYPE><DATATYPE-DEFINITION-STRING-REF>dt1</DATATYPE-DEFINITION-STRING-REF></TYPE></ATTRIBUTE-DEFINITION-STRING>
+    </SPEC-ATTRIBUTES></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1"><VALUES>${values}</VALUES><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE></SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS/><SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+  }
+
+  it("parses a DOCTYPE with more entity declarations than fast-xml-parser's old default of ~1000", () => {
+    const doc = parseReqIfXml(docWithDoctypeEntities(1100));
+    expect(doc.coreContent).toBeDefined();
+  });
+
+  it("parses many ordinary &amp;/&quot; references spread across attribute values", () => {
+    const doc = parseReqIfXml(docWithManyAmpersands(5000));
+    const obj = doc.coreContent.specObjects[0];
+    expect(obj.values[0]).toMatchObject({ kind: "STRING" });
+    expect((obj.values[0] as any).value).toContain('Terms & Conditions 0 "quoted"');
+  });
+
+  it("still rejects entity counts beyond an explicitly lowered limit", () => {
+    expect(() =>
+      parseReqIfXml(docWithDoctypeEntities(50), { processEntities: { maxEntityCount: 10 } }),
+    ).toThrow();
+  });
+});
+
 describe("real-world DOORS export", () => {
   it("parses header metadata", async () => {
     const xml = readFileSync(fixturePath, "utf-8");
