@@ -207,6 +207,27 @@ const pkg = await loadReqIfPackage(bytes, {
 const pkg = await loadReqIfPackage(bytes, { processEntities: false });
 ```
 
+## Plusieurs documents en onglets, numérotation, vue de lecture
+
+Trois options composables, pensées pour les gros exports (`.reqifz` à plusieurs modules) et pour produire un rendu plus proche d'un document Word :
+
+```ts
+const html = await renderPackageToHtml(pkg, {
+  layout: "tabs",        // "stacked" (défaut) ou "tabs" — bascule CSS pure, sans JS
+  chapterNumbers: true,  // 1, 1.1, 1.1.1, 1.2, 2... devant chaque titre, recommence à 1 par Specification
+  readingMode: true,     // masque ID / créé-modifié / panneau technique ; titres en balises <h3>-<h6>
+});
+```
+
+**`layout: "tabs"`** — s'applique à deux niveaux : entre les différents documents `.reqif` d'un même `.reqifz` (`renderPackageToHtml`), et entre les différentes `Specification` à l'intérieur d'un même document (`renderDocumentToHtml`). N'a aucun effet s'il n'y a qu'un seul document/qu'une seule spécification (pas d'onglet inutile pour un cas simple). Implémenté en CSS pur (case à cocher radio masquée + sélecteurs `:checked ~`) — aucun JavaScript, fonctionne même si le HTML est inséré statiquement sans script.
+
+**`chapterNumbers: true`** — préfixe chaque titre de sa position dans l'arborescence (`1`, `1.1`, `1.1.1`, `1.1.2`, `1.2`, `2`...). La numérotation repart à 1 à chaque nouvelle `Specification`, comme des documents séparés.
+
+**`readingMode: true`** — pense à un export PDF/Word : seuls les titres et le texte des exigences restent visibles. Concrètement :
+- l'encadré ID, la ligne "Créé par/Modifié par", et le panneau "Détails techniques" disparaissent (le contenu reste accessible par ailleurs via `showTechnicalByDefault`/le panneau technique si vous repassez en mode normal) ;
+- les titres passent de simples lignes en gras à de vraies balises `<h3>`...`<h6>` selon la profondeur (la `Specification` elle-même garde son `<h2>`) — meilleure structure pour la lecture, l'impression ou l'export PDF ;
+- le contenu que *vous* ajoutez via `customAttributeRenderers` reste affiché : seule la métadonnée générée automatiquement est masquée, pas ce que vous avez explicitement demandé.
+
 ## Sécurité
 
 Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'un tiers. `renderXhtmlContent` applique une liste blanche stricte de balises/attributs (alignée sur les modules XHTML autorisés par la spec : Text, List, Hypertext, Edit, Presentation, Basic Tables, Object, Style Attribute) :

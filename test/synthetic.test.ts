@@ -433,6 +433,125 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
   });
 });
 
+describe("synthetic fixture: chapterNumbers", () => {
+  it("does not number titles by default", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).toContain(">Parent requirement<");
+  });
+
+  it("prefixes top-level and nested titles with a Word-style chapter number", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, chapterNumbers: true });
+    expect(html).toContain(">1 Parent requirement<");
+    expect(html).toContain(">1.1 Child requirement<");
+  });
+
+  it("restarts numbering at 1 for each Specification", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    // Duplicate the single specification so there are two top-level ones.
+    const second = { ...doc.coreContent.specifications[0], identifier: "spec-2" };
+    doc.coreContent.specifications.push(second);
+    const index = new ReqIfIndex(doc);
+    const lookup = { get: () => undefined };
+    const html1 = renderSpecification(doc.coreContent.specifications[0], index, lookup, undefined, { chapterNumbers: true });
+    const html2 = renderSpecification(doc.coreContent.specifications[1], index, lookup, undefined, { chapterNumbers: true });
+    expect(html1).toContain(">1 Parent requirement<");
+    expect(html2).toContain(">1 Parent requirement<"); // restarted, not "2 ..."
+  });
+});
+
+describe("synthetic fixture: readingMode (Word-like clean view)", () => {
+  it("hides the id badge, the created/modified line, and the technical panel", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, readingMode: true });
+    expect(html).not.toContain('class="reqif-id"');
+    expect(html).not.toContain('class="reqif-meta-strip"');
+    expect(html).not.toContain('class="reqif-technical"');
+    expect(html).not.toContain("Détails techniques");
+    expect(html).not.toContain("Créé par");
+  });
+
+  it("still shows the title and the main content", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, readingMode: true });
+    expect(html).toContain("Parent requirement");
+    expect(html).toContain("The user shall be able to");
+  });
+
+  it("still shows custom-renderer content (it's consumer-authored, not auto-generated chrome)", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      readingMode: true,
+      customAttributeRenderers: [{ attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<em>${v.value}</em>` : undefined) }],
+    });
+    expect(html).toContain("<em>SRS-42</em>");
+  });
+
+  it("uses heading tags for titles instead of a plain bold summary", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, readingMode: true });
+    expect(html).toMatch(/<h3 class="reqif-node-heading">Parent requirement<\/h3>/);
+    expect(html).toMatch(/<h4 class="reqif-node-heading">Child requirement<\/h4>/);
+  });
+
+  it("combines cleanly with chapterNumbers", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, readingMode: true, chapterNumbers: true });
+    expect(html).toContain(">1 Parent requirement<");
+  });
+});
+
+describe("layout: tabs (multiple documents / specifications)", () => {
+  it("does not introduce a tab switcher for a single document", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, layout: "tabs" });
+    expect(html).not.toContain('class="reqif-tabs"');
+  });
+
+  it("renders a CSS-only tab switcher for multiple documents in one package", async () => {
+    const docA = SYNTHETIC_REQIF.replace('IDENTIFIER="hdr-1"', 'IDENTIFIER="hdr-1"').replace(
+      "<TITLE>Synthetic Sample</TITLE>",
+      "<TITLE>Document A</TITLE>",
+    );
+    const docB = SYNTHETIC_REQIF.replace(
+      "<TITLE>Synthetic Sample</TITLE>",
+      "<TITLE>Document B</TITLE>",
+    );
+    const zipBytes = zipSync({ "a.reqif": strToU8(docA), "b.reqif": strToU8(docB) });
+    const pkg = await loadReqIfPackage(zipBytes);
+    expect(pkg.documents).toHaveLength(2);
+
+    const html = await renderPackageToHtml(pkg, { includeCss: false, layout: "tabs" });
+    expect(html).toContain('class="reqif-tabs"');
+    expect(html).toContain(">Document A<");
+    expect(html).toContain(">Document B<");
+    // exactly one radio input has the `checked` attribute by default (the first tab)
+    const inputTags = html.match(/<input[^>]*>/g) ?? [];
+    expect(inputTags.filter((tag) => tag.includes("checked"))).toHaveLength(1);
+  });
+
+  it("renders a tab switcher across multiple Specifications within one document", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    const second = { ...doc.coreContent.specifications[0], identifier: "spec-2", longName: "Second Spec" };
+    doc.coreContent.specifications.push(second);
+    const index = new ReqIfIndex(doc);
+
+    const html = await renderDocumentToHtml(doc, { resolve: () => undefined, list: () => [] }, { includeCss: false, layout: "tabs" });
+    expect(html).toContain('class="reqif-tabs"');
+    expect(html).toContain(">Demo Specification<");
+    expect(html).toContain(">Second Spec<");
+  });
+
+  it("keeps stacked layout (default) when layout option is omitted, even with multiple documents", async () => {
+    const zipBytes = zipSync({ "a.reqif": strToU8(SYNTHETIC_REQIF), "b.reqif": strToU8(SYNTHETIC_REQIF) });
+    const pkg = await loadReqIfPackage(zipBytes);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).not.toContain('class="reqif-tabs"');
+  });
+});
+
 describe("synthetic fixture: rendering & sanitization", () => {
   it("escapes/strips dangerous markup and keeps safe formatting", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);

@@ -3,6 +3,7 @@ import { toBase64 } from "./base64.js";
 import { escapeHtml } from "./escape.js";
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
+import { renderTabs } from "./tabs.js";
 import {
   buildAttributeRenderContext,
   collectHiddenDefinitionIds,
@@ -101,6 +102,30 @@ export interface RenderOptions {
    * instead of the structural LONG-NAME field.
    */
   titleAttributes?: string[];
+  /**
+   * How to lay out multiple documents (a .reqifz package) or multiple
+   * Specifications (within one document) relative to each other.
+   * "stacked" (default): one after another, as before.
+   * "tabs": a CSS-only tabbed switcher (no JavaScript) — only kicks in when
+   * there's actually more than one document/specification; a lone one is
+   * never wrapped in a pointless single tab.
+   */
+  layout?: "stacked" | "tabs";
+  /**
+   * Prefix each requirement's title with a Word-style chapter number
+   * (1, 1.1, 1.1.1, 1.1.2, 1.2, 2, ...), restarting at 1 for each
+   * Specification. Default: false.
+   */
+  chapterNumbers?: boolean;
+  /**
+   * Strip the metadata chrome (id badge, created/modified line, technical-
+   * details panel) and switch headings to a flatter, document-like look —
+   * for a clean reading view closer to a Word document, where only titles
+   * and the actual requirement text remain. Content you explicitly asked
+   * for via `customAttributeRenderers` still shows; only the *automatic*
+   * metadata is hidden. Default: false.
+   */
+  readingMode?: boolean;
 }
 
 const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
@@ -111,8 +136,21 @@ export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOpti
   const parts = await Promise.all(
     pkg.documents.map((doc) => renderDocumentToHtml(doc, attachments, { ...options, includeCss: false })),
   );
+
+  let body: string;
+  if (options.layout === "tabs" && pkg.documents.length > 1) {
+    const items = pkg.documents.map((doc, i) => ({
+      label: doc.header.title || `${options.labels?.headerTitle ?? DEFAULT_LABELS.headerTitle} ${i + 1}`,
+      html: parts[i],
+    }));
+    body = renderTabs(items);
+  } else {
+    body = parts.join("");
+  }
+
   const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
-  return `${css}<div class="reqif-preview">${parts.join("")}</div>`;
+  const rootClass = options.readingMode ? "reqif-preview reqif-reading-mode" : "reqif-preview";
+  return `${css}<div class="${rootClass}">${body}</div>`;
 }
 
 /** Renders a single ReqIfDocument (header + all its specifications) to HTML. */
@@ -125,13 +163,23 @@ export async function renderDocumentToHtml(
   const index = new ReqIfIndex(doc);
   const lookup = await buildAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
 
-  const header = renderHeader(doc, labels);
-  const specs = doc.coreContent.specifications
-    .map((spec) => renderSpecification(spec, index, lookup, labels, options))
-    .join("");
+  const header = options.readingMode ? "" : renderHeader(doc, labels);
+  const specHtmls = doc.coreContent.specifications.map((spec) => renderSpecification(spec, index, lookup, labels, options));
+
+  let specsHtml: string;
+  if (options.layout === "tabs" && specHtmls.length > 1) {
+    const items = doc.coreContent.specifications.map((spec, i) => ({
+      label: spec.longName || labels.untitled,
+      html: specHtmls[i],
+    }));
+    specsHtml = renderTabs(items);
+  } else {
+    specsHtml = specHtmls.join("");
+  }
 
   const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
-  return `${css}<div class="reqif-preview">${header}<div class="reqif-specs">${specs}</div></div>`;
+  const rootClass = options.readingMode ? "reqif-preview reqif-reading-mode" : "reqif-preview";
+  return `${css}<div class="${rootClass}">${header}<div class="reqif-specs">${specsHtml}</div></div>`;
 }
 
 /** Renders one Specification subtree (useful for lazy/virtualized UIs). */
@@ -143,7 +191,9 @@ export function renderSpecification(
   options: RenderOptions = {},
 ): string {
   const title = escapeHtml(spec.longName || labels.untitled);
-  const nodes = spec.children.map((n) => renderHierarchyNode(n, index, attachments, labels, options)).join("");
+  const nodes = spec.children
+    .map((n, i) => renderHierarchyNode(n, index, attachments, labels, options, [i + 1]))
+    .join("");
   return `<section class="reqif-spec"><h2 class="reqif-spec-title">${title}</h2><div class="reqif-tree">${nodes}</div></section>`;
 }
 
@@ -195,21 +245,37 @@ function renderHierarchyNode(
   attachments: AttachmentLookup,
   labels: RenderLabels,
   options: RenderOptions,
+  path: number[],
 ): string {
   const obj = index.specObjects.get(node.objectRef);
   const body = obj
     ? renderSpecObjectBody(obj, index, attachments, labels, options)
     : `<p class="reqif-missing">${labels.noContent}</p>`;
-  const title = escapeHtml(resolveTitle(obj, node, index, labels, options.titleAttributes));
-  const childrenHtml = node.children.map((c) => renderHierarchyNode(c, index, attachments, labels, options)).join("");
+
+  const rawTitle = resolveTitle(obj, node, index, labels, options.titleAttributes);
+  const numberPrefix = options.chapterNumbers ? path.join(".") + " " : "";
+  const titleText = numberPrefix + rawTitle;
+
+  const titleHtml = options.readingMode
+    ? `<h${headingLevelFor(path.length)} class="reqif-node-heading">${escapeHtml(titleText)}</h${headingLevelFor(path.length)}>`
+    : escapeHtml(titleText);
+
+  const childrenHtml = node.children
+    .map((c, i) => renderHierarchyNode(c, index, attachments, labels, options, [...path, i + 1]))
+    .join("");
 
   return (
     `<details class="reqif-node" open>` +
-    `<summary class="reqif-node-title">${title}</summary>` +
+    `<summary class="reqif-node-title">${titleHtml}</summary>` +
     `<div class="reqif-node-body">${body}</div>` +
     (childrenHtml ? `<div class="reqif-node-children">${childrenHtml}</div>` : "") +
     `</details>`
   );
+}
+
+/** h3 at the top level (the Specification title is already an h2), capped at h6. */
+function headingLevelFor(depth: number): number {
+  return Math.min(depth + 2, 6);
 }
 
 /**
@@ -249,7 +315,9 @@ function renderSpecObjectBody(
   const dateLocale = options.dateLocale ?? "fr-FR";
 
   const simple = renderSimpleView(obj, specType, index, attachments, labels, options, lifecycle, dateLocale);
-  const technical = renderTechnicalPanel(obj, specType, index, attachments, labels, options);
+  const technical = options.readingMode
+    ? ""
+    : renderTechnicalPanel(obj, specType, index, attachments, labels, options);
   return `<div class="reqif-simple">${simple}</div>${technical}`;
 }
 
@@ -265,8 +333,10 @@ function renderSimpleView(
   dateLocale: string,
 ): string {
   const displayId = lifecycle.foreignId ?? obj.identifier;
-  const idHtml = `<div class="reqif-id">${escapeHtml(labels.idLabel)}: <code>${escapeHtml(displayId)}</code></div>`;
-  const metaHtml = renderLifecycleMeta(lifecycle, labels, dateLocale);
+  const idHtml = options.readingMode
+    ? ""
+    : `<div class="reqif-id">${escapeHtml(labels.idLabel)}: <code>${escapeHtml(displayId)}</code></div>`;
+  const metaHtml = options.readingMode ? "" : renderLifecycleMeta(lifecycle, labels, dateLocale);
 
   const formatValue = (value: AttributeValue | undefined) =>
     value ? renderAttributeValue(value, index, attachments, labels) : "";
@@ -548,4 +618,21 @@ const DEFAULT_CSS = `
 .reqif-meta-role { color: #888; }
 .reqif-meta-chip time { color: #666; }
 .reqif-custom-attr { font-size: 14px; contain: layout; }
+
+/* Tabs (CSS-only, see tabs.ts) */
+.reqif-tab-input { position: absolute; opacity: 0; pointer-events: none; }
+.reqif-tab-headers { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #e2e2e2; margin-bottom: 16px; }
+.reqif-tab-label { cursor: pointer; padding: 8px 14px; font-size: 14px; font-weight: 600; color: #666; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
+.reqif-tab-label:hover { color: #0b62d6; }
+.reqif-tab-panel { display: none; }
+
+/* Reading mode: strip the "card list" look for something closer to a flowing Word document */
+.reqif-reading-mode .reqif-node { border: none; border-radius: 0; padding: 0; margin: 0 0 18px; background: transparent; }
+.reqif-reading-mode .reqif-tree { border-left: none; padding-left: 0; }
+.reqif-reading-mode .reqif-node-children { margin-left: 22px; margin-top: 8px; }
+.reqif-reading-mode .reqif-node-title { cursor: default; list-style: none; }
+.reqif-reading-mode .reqif-node-title::-webkit-details-marker { display: none; }
+.reqif-reading-mode .reqif-node-heading { margin: 0 0 6px; font-weight: 600; }
+.reqif-reading-mode .reqif-node-body { overflow: visible; }
+.reqif-reading-mode .reqif-content { line-height: 1.7; font-size: 15px; }
 `;
