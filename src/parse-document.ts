@@ -35,7 +35,9 @@ import type {
   Specification,
 } from "./types.js";
 
-const PARSER_OPTIONS = {
+const DEFAULT_MAX_NESTED_TAGS = 10_000;
+
+const BASE_PARSER_OPTIONS = {
   preserveOrder: true,
   ignoreAttributes: false,
   attributeNamePrefix: "",
@@ -49,11 +51,28 @@ const PARSER_OPTIONS = {
   htmlEntities: true,
 } as const;
 
+export interface ParseOptions {
+  /**
+   * fast-xml-parser refuses XML nested deeper than this many levels, as a
+   * defense against maliciously crafted "XML bomb" files — but its default
+   * (100) is too low for real-world ReqIF: a deep specification hierarchy
+   * combined with richly nested XHTML content (e.g. pasted from Word) can
+   * easily exceed it, causing a "Maximum nested tags exceeded" error on a
+   * perfectly legitimate document. Default here: 10000. Lower it if you're
+   * processing untrusted files and want tighter protection against
+   * pathological input; raise it further for unusually deep documents.
+   */
+  maxNestedTags?: number;
+}
+
 /** Parses a single ReqIF XML document (the content of one `.reqif` file). */
-export function parseReqIfXml(xml: string): ReqIfDocument {
+export function parseReqIfXml(xml: string, options: ParseOptions = {}): ReqIfDocument {
   let roots: XNode[];
   try {
-    const parser = new XMLParser(PARSER_OPTIONS as any);
+    const parser = new XMLParser({
+      ...BASE_PARSER_OPTIONS,
+      maxNestedTags: options.maxNestedTags ?? DEFAULT_MAX_NESTED_TAGS,
+    } as any);
     roots = parser.parse(xml) as XNode[];
   } catch (err) {
     throw new ReqIfParseError("Failed to parse XML.", err);

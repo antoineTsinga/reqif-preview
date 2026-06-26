@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
-import { parseReqIfXml } from "./parse-document.js";
+import { parseReqIfXml, type ParseOptions } from "./parse-document.js";
 import { ReqIfParseError } from "./errors.js";
 import type { AttachmentResolver, ReqIfAttachment, ReqIfDocument, ReqIfPackage } from "./types.js";
 
@@ -111,15 +111,15 @@ export function createAttachmentResolver(
  * bare `.reqif` XML document or a `.reqifz` zip archive (which may legally
  * contain several `.reqif` documents plus binary attachments).
  */
-export async function loadReqIfPackage(input: ReqIfInput): Promise<ReqIfPackage> {
+export async function loadReqIfPackage(input: ReqIfInput, options: ParseOptions = {}): Promise<ReqIfPackage> {
   if (typeof input === "string") {
-    const doc = parseReqIfXml(input);
+    const doc = parseReqIfXml(input, options);
     return { documents: [doc], document: doc, attachments: EMPTY_ATTACHMENTS };
   }
 
   const bytes = toUint8Array(input);
   if (!looksLikeZip(bytes)) {
-    const doc = parseReqIfXml(strFromU8(bytes));
+    const doc = parseReqIfXml(strFromU8(bytes), options);
     return { documents: [doc], document: doc, attachments: EMPTY_ATTACHMENTS };
   }
 
@@ -135,7 +135,7 @@ export async function loadReqIfPackage(input: ReqIfInput): Promise<ReqIfPackage>
   for (const [path, data] of Object.entries(entries)) {
     if (path.endsWith("/")) continue; // directory marker, no content
     if (/\.reqif$/i.test(path)) {
-      documents.push(parseReqIfXml(strFromU8(data)));
+      documents.push(parseReqIfXml(strFromU8(data), options));
     } else {
       attachmentEntries.set(path, data);
     }

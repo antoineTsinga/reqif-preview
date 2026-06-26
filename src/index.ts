@@ -1,6 +1,6 @@
 export * from "./types.js";
 export { ReqIfParseError } from "./errors.js";
-export { parseReqIfXml } from "./parse-document.js";
+export { parseReqIfXml, type ParseOptions } from "./parse-document.js";
 export {
   loadReqIfPackage,
   createAttachmentResolver,

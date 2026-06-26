@@ -181,6 +181,21 @@ const pkg = await loadReqIfPackage(xmlString);
 const html = await renderPackageToHtml(pkg, { attachments });
 ```
 
+## Documents très imbriqués
+
+`fast-xml-parser` (utilisé en interne) refuse par défaut tout XML imbriqué sur plus de 100 niveaux, comme protection contre les fichiers XML malveillants ("XML bomb"). C'est trop bas pour de vrais documents ReqIF : une hiérarchie de spécifications profonde combinée à du texte enrichi richement imbriqué (typiquement du contenu collé depuis Word) dépasse facilement cette limite sur un document par ailleurs parfaitement valide, avec une erreur `Maximum nested tags exceeded`.
+
+`reqif-preview` relève cette limite à **10 000** par défaut. Si besoin, ajustez-la :
+
+```ts
+// Document encore plus profondément imbriqué :
+const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 50_000 });
+
+// À l'inverse, si vous traitez des fichiers non fiables et voulez une
+// protection plus stricte contre les fichiers malveillants :
+const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 200 });
+```
+
 ## Sécurité
 
 Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'un tiers. `renderXhtmlContent` applique une liste blanche stricte de balises/attributs (alignée sur les modules XHTML autorisés par la spec : Text, List, Hypertext, Edit, Presentation, Basic Tables, Object, Style Attribute) :
