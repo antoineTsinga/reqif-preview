@@ -10,23 +10,9 @@ import type { SpecObject } from "./types.js";
  * "Foreign ID" and "ForeignID" are all recognized.
  */
 const FOREIGN_ID_KEYS = new Set(["reqifforeignid", "foreignid"]);
-const CREATED_BY_KEYS = new Set([
-  "reqifforeigncreatedby",
-  "foreigncreatedby",
-  "createdby",
-]);
-const CREATED_ON_KEYS = new Set([
-  "reqifforeigncreatedon",
-  "foreigncreatedon",
-  "createdon",
-  "creationdate",
-]);
-const MODIFIED_BY_KEYS = new Set([
-  "reqifforeignmodifiedby",
-  "foreignmodifiedby",
-  "modifiedby",
-  "lastmodifiedby",
-]);
+const CREATED_BY_KEYS = new Set(["reqifforeigncreatedby", "foreigncreatedby", "createdby"]);
+const CREATED_ON_KEYS = new Set(["reqifforeigncreatedon", "foreigncreatedon", "createdon", "creationdate"]);
+const MODIFIED_BY_KEYS = new Set(["reqifforeignmodifiedby", "foreignmodifiedby", "modifiedby", "lastmodifiedby"]);
 const MODIFIED_ON_KEYS = new Set([
   "reqifforeignmodifiedon",
   "foreignmodifiedon",
@@ -48,10 +34,8 @@ export interface LifecycleInfo {
   consumedDefinitionIds: Set<string>;
 }
 
-export function extractLifecycleInfo(
-  obj: SpecObject,
-  index: ReqIfIndex,
-): LifecycleInfo {
+
+export function extractLifecycleInfo(obj: SpecObject, index: ReqIfIndex): LifecycleInfo {
   const info: LifecycleInfo = { consumedDefinitionIds: new Set() };
 
   for (const value of obj.values) {
