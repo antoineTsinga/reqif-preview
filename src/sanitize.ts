@@ -1,3 +1,4 @@
+import { escapeHtml } from "./escape.js";
 import type { XhtmlContent, XhtmlElementNode, XhtmlNode } from "./types.js";
 
 /**
@@ -47,13 +48,6 @@ export interface AttachmentLookup {
 
 export interface XhtmlRenderOptions {
   attachments?: AttachmentLookup;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 function escapeAttr(s: string): string {

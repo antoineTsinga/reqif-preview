@@ -376,6 +376,63 @@ describe("synthetic fixture: titleAttributes (user-controlled title fallback)", 
   });
 });
 
+describe("synthetic fixture: customAttributeRenderers fail-safe against broken HTML", () => {
+  it("escapes (instead of inserting raw) an unclosed-tag custom renderer output, and keeps content/technical intact afterwards", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<div class="puid-badge">${v.value}` : undefined) }, // missing </div>
+      ],
+    });
+    // the broken tag must be escaped, not inserted raw...
+    expect(html).toContain('&lt;div class="puid-badge"&gt;SRS-42');
+    // ...and everything that comes after must still be correctly nested
+    // (i.e. the content + technical panel weren't swallowed by the open div).
+    expect(html).toContain('<div class="reqif-content">');
+    expect(html).toContain('<details class="reqif-technical">');
+  });
+
+  it("escapes a custom renderer output with a stray extra closing tag", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<span>${v.value}</span></span>` : undefined) }, // extra </span>
+      ],
+    });
+    expect(html).toContain("&lt;span&gt;SRS-42&lt;/span&gt;&lt;/span&gt;");
+    expect(html).toContain('<div class="reqif-content">');
+  });
+
+  it("still inserts well-formed custom HTML as raw markup, unescaped", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<span class="puid-badge">${v.value}</span>` : undefined) },
+      ],
+    });
+    expect(html).toContain('<span class="puid-badge">SRS-42</span>');
+    expect(html).not.toContain("&lt;span");
+  });
+  it("escapes a real-world unclosed <table> (the actual bug reported)", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => `<table><tr><th>Champ</th><th>Valeur</th></tr><tr><td>PUID</td><td>SRS-42</td></tr>`, // missing </table>
+        },
+      ],
+    });
+    expect(html).toContain("&lt;table&gt;");
+    expect(html).toContain('<div class="reqif-content">');
+    expect(html).toContain('<details class="reqif-technical">');
+  });
+});
+
 describe("synthetic fixture: rendering & sanitization", () => {
   it("escapes/strips dangerous markup and keeps safe formatting", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);

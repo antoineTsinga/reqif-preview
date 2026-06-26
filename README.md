@@ -105,6 +105,7 @@ const html = await renderPackageToHtml(pkg, {
 - Par défaut, l'attribut ciblé reste aussi visible dans le panneau technique (transparence totale) ; passez `hideFromTechnical: true` si vous voulez l'en masquer puisqu'il est déjà affiché via le rendu personnalisé.
 - Une exception levée dans `render()` est interceptée : elle n'interrompt jamais le rendu du reste du document.
 - Le HTML retourné est inséré tel quel (ce n'est pas du contenu du document ReqIF, mais du code que *vous* écrivez) — échappez vous-même tout texte brut interpolé, par exemple avec `escapeHtml` exporté par la lib.
+- **Filet de sécurité** : si le HTML retourné a des balises mal fermées (une balise oubliée, une balise fermante en trop), la lib le détecte et l'affiche comme texte échappé plutôt que de l'insérer brut — sinon ce déséquilibre casserait la structure de *tout ce qui est affiché après* (contenu, détails techniques, voire les exigences suivantes dans l'arbre). Un avertissement est alors envoyé dans la console avec le HTML fautif, pour repérer facilement l'erreur pendant le développement.
 
 ### Dans le navigateur, depuis un `<input type="file">`
 

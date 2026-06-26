@@ -1,4 +1,6 @@
 import { resolveAttribute } from "./attribute-lookup.js";
+import { escapeHtml } from "./escape.js";
+import { isBalancedHtml } from "./html-balance.js";
 import { ReqIfIndex } from "./lookup.js";
 import type { AttachmentLookup } from "./sanitize.js";
 import type { AttributeDefinition, AttributeValue, SpecObject, SpecType } from "./types.js";
@@ -81,7 +83,25 @@ export function renderCustomAttributes(
       // A misbehaving consumer-supplied renderer must never break the whole preview.
       continue;
     }
-    if (html) parts.push(`<div class="reqif-custom-attr">${html}</div>`);
+    if (!html) continue;
+
+    if (!isBalancedHtml(html)) {
+      // An unclosed or stray extra tag here would otherwise corrupt the
+      // nesting of *everything* rendered after it (content, technical
+      // panel, even sibling tree nodes) — fail safe by showing the text
+      // instead of breaking the whole layout, and say so loudly so it gets
+      // noticed and fixed during development.
+      if (typeof console !== "undefined") {
+        console.warn(
+          `[reqif-preview] customAttributeRenderers: the HTML returned for attribute "${renderer.attribute}" has unbalanced tags (an unclosed or a stray extra tag). ` +
+            `It was escaped as plain text instead of being inserted as-is, to avoid breaking the layout of everything rendered after it. Offending output:`,
+          html,
+        );
+      }
+      html = escapeHtml(html);
+    }
+
+    parts.push(`<div class="reqif-custom-attr">${html}</div>`);
   }
   return parts.join("");
 }

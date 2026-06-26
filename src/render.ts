@@ -1,5 +1,6 @@
 import { ReqIfIndex } from "./lookup.js";
 import { toBase64 } from "./base64.js";
+import { escapeHtml } from "./escape.js";
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
 import {
@@ -150,9 +151,7 @@ export function renderSpecification(
 // Internals
 // ---------------------------------------------------------------------------
 
-export function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+export { escapeHtml } from "./escape.js";
 
 function escapeAttr(s: string): string {
   return escapeHtml(s).replace(/"/g, "&quot;");
@@ -518,7 +517,7 @@ const DEFAULT_CSS = `
 .reqif-tree { border-left: 2px solid #eee; padding-left: 12px; }
 .reqif-node { border: 1px solid #e8e8e8; border-radius: 6px; padding: 6px 10px; margin: 6px 0; background: #fff; }
 .reqif-node-title { cursor: pointer; font-weight: 600; }
-.reqif-node-body { margin-top: 8px; }
+.reqif-node-body { margin-top: 8px; contain: layout; overflow: hidden; }
 .reqif-node-children { margin-left: 14px; }
 .reqif-attrs { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
 .reqif-attr { display: contents; }
@@ -548,5 +547,5 @@ const DEFAULT_CSS = `
 .reqif-meta-chip { display: inline-flex; align-items: center; gap: 4px; background: #f5f5f5; border-radius: 6px; padding: 2px 8px; color: #444; }
 .reqif-meta-role { color: #888; }
 .reqif-meta-chip time { color: #666; }
-.reqif-custom-attr { font-size: 14px; }
+.reqif-custom-attr { font-size: 14px; contain: layout; }
 `;
