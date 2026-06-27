@@ -142,6 +142,41 @@ export interface RenderOptions {
    */
   chapterNumberAttributes?: string[];
   /**
+   * For objects that qualify as chapters (per `chapterNumberAttributes`), an
+   * empty title or empty content is treated as intentional — a bare chapter
+   * heading with nothing else under it directly is normal, not a data-
+   * quality gap — so the usual "(sans titre)"/"(vide)" placeholders are
+   * left out entirely for those objects specifically. Other objects
+   * (regular requirements) keep showing the placeholders as before, since a
+   * leaf requirement with no title/content usually *is* worth flagging.
+   * Has no effect unless `chapterNumberAttributes` is also set. Default: false.
+   *
+   * This is really just a convenience shortcut for the chapter case — for
+   * any other reason an object might legitimately have no title (e.g. a
+   * plain paragraph/information object that's never meant to have one) or
+   * no content (e.g. a pure heading), use `isTitleless`/`isContentless`
+   * below instead, or alongside this.
+   */
+  suppressEmptyPlaceholdersForChapters?: boolean;
+  /**
+   * Decide, for any criterion of your own, whether a given object is
+   * expected to have no title — e.g. because its SpecObjectType is a plain
+   * "Paragraph"/"Information" type rather than a heading or requirement.
+   * When this returns true, "(sans titre)" is left out for that object: an
+   * empty title shows as empty, not flagged as missing data. Composes with
+   * `suppressEmptyPlaceholdersForChapters` (either one suppressing is
+   * enough). `index` is provided so you can inspect other attributes via
+   * the exported `resolveAttribute`/`valueToPlainText` helpers if needed.
+   */
+  isTitleless?: (obj: SpecObject | undefined, specType: SpecType | undefined, index: ReqIfIndex) => boolean;
+  /**
+   * Same idea for the "(vide)" content placeholder — decide whether an
+   * empty content area is expected for a given object (e.g. a pure heading
+   * with nothing directly under it), rather than missing data worth
+   * flagging. Composes with `suppressEmptyPlaceholdersForChapters`.
+   */
+  isContentless?: (obj: SpecObject, specType: SpecType | undefined, index: ReqIfIndex) => boolean;
+  /**
    * Show each object's incoming/outgoing SpecRelations (traceability links
    * to other requirements), with a same-page anchor link when the related
    * object is rendered in the same output. Default: true — unlike the
@@ -285,6 +320,20 @@ function isChapterNode(obj: SpecObject | undefined, index: ReqIfIndex, attrs: st
 }
 
 /**
+ * Whether an object is "a chapter" for the purpose of suppressing the
+ * empty-title/empty-content placeholders — distinct from the numbering
+ * qualification above, which defaults to "everything qualifies" when no
+ * `chapterNumberAttributes` is configured. Suppression should only ever
+ * kick in when the caller has *explicitly* told us which attribute marks a
+ * chapter; otherwise every object in the document would silently lose its
+ * placeholders.
+ */
+function isRealChapter(obj: SpecObject | undefined, index: ReqIfIndex, options: RenderOptions): boolean {
+  if (!options.chapterNumberAttributes?.length) return false;
+  return isChapterNode(obj, index, options.chapterNumberAttributes);
+}
+
+/**
  * Renders one set of siblings, handling the chapter-numbering counter for
  * this level: with `chapterNumberAttributes` set, only matching nodes
  * consume a number (others are skipped, like body paragraphs between Word
@@ -329,13 +378,19 @@ function renderHierarchyNode(
   depth: number,
 ): string {
   const obj = index.specObjects.get(node.objectRef);
+  const specType = obj ? index.specTypes.get(obj.typeRef) : undefined;
+  const isChapter = isRealChapter(obj, index, options);
+  const chapterShortcut = !!options.suppressEmptyPlaceholdersForChapters && isChapter;
+  const suppressTitle = chapterShortcut || !!options.isTitleless?.(obj, specType, index);
+  const suppressContent = chapterShortcut || (!!obj && !!options.isContentless?.(obj, specType, index));
+
   const body = obj
-    ? renderSpecObjectBody(obj, index, attachments, labels, options)
+    ? renderSpecObjectBody(obj, index, attachments, labels, options, isChapter, suppressContent)
     : `<p class="reqif-missing">${labels.noContent}</p>`;
 
-  const rawTitle = resolveTitle(obj, node, index, labels, options.titleAttributes);
+  const rawTitle = resolveTitle(obj, node, index, labels, options.titleAttributes, suppressTitle);
   const numberPrefix = displayPath ? displayPath.join(".") + " " : "";
-  const titleText = numberPrefix + rawTitle;
+  const titleText = numberPrefix ? (rawTitle ? `${numberPrefix}${rawTitle}` : numberPrefix.trim()) : rawTitle;
 
   const titleHtml = options.readingMode
     ? `<h${headingLevelFor(depth)} class="reqif-node-heading">${escapeHtml(titleText)}</h${headingLevelFor(depth)}>`
@@ -361,7 +416,9 @@ function headingLevelFor(depth: number): number {
 /**
  * Title resolution chain: the object's own LONG-NAME, then its hierarchy
  * node's LONG-NAME, then each of `titleAttributes` in order (first non-empty
- * value wins), then a generic "untitled" fallback.
+ * value wins), then a generic "untitled" fallback — unless `suppressFallback`
+ * is set (chapter shortcut and/or `isTitleless` said so), in which case an
+ * empty title is left empty, on purpose.
  */
 function resolveTitle(
   obj: SpecObject | undefined,
@@ -369,6 +426,7 @@ function resolveTitle(
   index: ReqIfIndex,
   labels: RenderLabels,
   titleAttributes: string[] | undefined,
+  suppressFallback: boolean | undefined,
 ): string {
   if (obj?.longName) return obj.longName;
   if (node.longName) return node.longName;
@@ -380,7 +438,7 @@ function resolveTitle(
       if (text) return text;
     }
   }
-  return labels.untitled;
+  return suppressFallback ? "" : labels.untitled;
 }
 
 function renderSpecObjectBody(
@@ -389,12 +447,14 @@ function renderSpecObjectBody(
   attachments: AttachmentLookup,
   labels: RenderLabels,
   options: RenderOptions,
+  isChapter: boolean,
+  suppressContent: boolean,
 ): string {
   const specType = index.specTypes.get(obj.typeRef);
   const lifecycle = extractLifecycleInfo(obj, index);
   const dateLocale = options.dateLocale ?? "fr-FR";
 
-  const simple = renderSimpleView(obj, specType, index, attachments, labels, options, lifecycle, dateLocale);
+  const simple = renderSimpleView(obj, specType, index, attachments, labels, options, lifecycle, dateLocale, isChapter, suppressContent);
   const technical = options.readingMode
     ? ""
     : renderTechnicalPanel(obj, specType, index, attachments, labels, options);
@@ -411,6 +471,8 @@ function renderSimpleView(
   options: RenderOptions,
   lifecycle: ReturnType<typeof extractLifecycleInfo>,
   dateLocale: string,
+  isChapter: boolean,
+  suppressContent: boolean,
 ): string {
   const displayId = lifecycle.foreignId ?? obj.identifier;
   const idHtml = options.readingMode
@@ -420,18 +482,19 @@ function renderSimpleView(
 
   const formatValue = (value: AttributeValue | undefined) =>
     value ? renderAttributeValue(value, index, attachments, labels) : "";
-  const ctx = buildAttributeRenderContext(obj, specType, index, attachments, formatValue);
+  const ctx = buildAttributeRenderContext(obj, specType, index, attachments, formatValue, isChapter);
   const before = renderCustomAttributes(options.customAttributeRenderers, "before", ctx);
   const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx);
 
   const contentHtml = resolveContentHtml(obj, index, attachments, labels, lifecycle, options.contentAttributes);
   const relationsHtml = options.showRelations === false ? "" : renderRelations(obj, index, labels);
+  const emptyContentHtml = suppressContent ? "" : `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`;
 
   return (
     idHtml +
     metaHtml +
     before +
-    (contentHtml || `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`) +
+    (contentHtml || emptyContentHtml) +
     after +
     relationsHtml
   );
@@ -766,7 +829,20 @@ const DEFAULT_CSS = `
 .reqif-reading-mode .reqif-node-children { margin-left: 22px; margin-top: 8px; }
 .reqif-reading-mode .reqif-node-title { cursor: default; list-style: none; }
 .reqif-reading-mode .reqif-node-title::-webkit-details-marker { display: none; }
-.reqif-reading-mode .reqif-node-heading { margin: 0 0 6px; font-weight: 600; }
+.reqif-reading-mode .reqif-node-heading {
+  margin: 0 0 6px; font-weight: 600; line-height: 1.3;
+  /* Headings are nested inside each other's containers, so browsers' default
+     em-based h3..h6 sizing would COMPOUND with depth (each level's em is
+     relative to its own, already-shrunk, parent) and shrink illegibly fast.
+     Fixed rem sizes (relative to the root, never to a nested ancestor) with
+     a comfortable floor fix that: it gets gently smaller down to h6, then
+     stays exactly that size for any further depth instead of continuing to shrink. */
+  font-size: 1rem;
+}
+.reqif-reading-mode h3.reqif-node-heading { font-size: 1.3rem; }
+.reqif-reading-mode h4.reqif-node-heading { font-size: 1.15rem; }
+.reqif-reading-mode h5.reqif-node-heading { font-size: 1.05rem; }
+.reqif-reading-mode h6.reqif-node-heading { font-size: 0.95rem; }
 .reqif-reading-mode .reqif-node-body { overflow: visible; }
 .reqif-reading-mode .reqif-content { line-height: 1.7; font-size: 15px; }
 `;

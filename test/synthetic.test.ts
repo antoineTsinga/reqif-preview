@@ -641,6 +641,180 @@ describe("synthetic fixture: spec relations (liaisons)", () => {
   });
 });
 
+describe("readingMode: heading sizes don't shrink illegibly with depth", () => {
+  it("gives each heading level an explicit rem-based size instead of relying on compounding em defaults", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { readingMode: true }); // includeCss: true (default) on purpose here
+    expect(html).toContain("h3.reqif-node-heading { font-size: 1.3rem; }");
+    expect(html).toContain("h4.reqif-node-heading { font-size: 1.15rem; }");
+    expect(html).toContain("h5.reqif-node-heading { font-size: 1.05rem; }");
+    expect(html).toContain("h6.reqif-node-heading { font-size: 0.95rem; }");
+  });
+
+  it("caps at h6/0.95rem instead of continuing to shrink for very deep trees", async () => {
+    // Build a chain 6 levels deep (deeper than the h3..h6 cap of 4 levels).
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    const index = new ReqIfIndex(doc);
+    const so1 = doc.coreContent.specObjects[0];
+    let lastChildren = doc.coreContent.specifications[0].children[0].children[0].children; // under so-3
+    for (let i = 0; i < 4; i++) {
+      const newNode = { identifier: `deep-${i}`, values: [], objectRef: so1.identifier, children: [] as any[] };
+      lastChildren.push(newNode);
+      lastChildren = newNode.children;
+    }
+    const html = await renderPackageToHtml({ documents: [doc], document: doc, attachments: { resolve: () => undefined, list: () => [] } }, { readingMode: true });
+    // Every heading tag actually used is one of h3..h6 — never anything smaller/invalid like h7.
+    const tags = [...html.matchAll(/<h(\d) class="reqif-node-heading">/g)].map((m) => Number(m[1]));
+    expect(tags.length).toBeGreaterThan(0);
+    expect(Math.max(...tags)).toBe(6);
+    expect(tags.every((t) => t >= 3 && t <= 6)).toBe(true);
+  });
+});
+
+describe("suppressEmptyPlaceholdersForChapters", () => {
+  it("by default still shows '(vide)'/'(sans titre)' even for chapter-qualifying objects", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    // so-1 has a ChapterName but also a LONG-NAME and content, so let's use a
+    // bare chapter object with neither: strip so-3's title and give it no content.
+    doc.coreContent.specObjects[2].longName = undefined;
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      chapterNumberAttributes: ["ChapterName"],
+    });
+    expect(html).toContain("(sans titre)");
+    expect(html).toContain("(vide)");
+  });
+
+  it("suppresses both placeholders for the chapter object itself, leaving non-chapter siblings unaffected", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[2].longName = undefined; // so-3: has ChapterName, no title, no content
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      chapterNumberAttributes: ["ChapterName"],
+      suppressEmptyPlaceholdersForChapters: true,
+    });
+    // Isolate so-3's own node: no placeholder text, just an empty <summary> and no empty-content <p>.
+    const so3Start = html.indexOf('id="reqif-obj-so-3"');
+    const so3Block = html.slice(so3Start, html.indexOf("</details>", so3Start));
+    expect(so3Block).not.toContain("(sans titre)");
+    expect(so3Block).not.toContain("(vide)");
+    // so-2 (not a chapter: no ChapterName) keeps its own legitimate "(vide)".
+    const so2Start = html.indexOf('id="reqif-obj-so-2"');
+    const so2Block = html.slice(so2Start, so3Start);
+    expect(so2Block).toContain("(vide)");
+  });
+
+  it("still shows the placeholders for non-chapter objects, even with the option on", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    // so-2 ("Child requirement") has a title and is not empty, but let's check
+    // a genuinely empty *non*-chapter case stays flagged: so-3 without ChapterName matching.
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[1].longName = undefined; // so-2: no ChapterName attribute at all -> not a chapter
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      chapterNumberAttributes: ["ChapterName"],
+      suppressEmptyPlaceholdersForChapters: true,
+    });
+    expect(html).toContain("(sans titre)"); // so-2 is not a chapter -> still flagged
+  });
+
+  it("has no effect without chapterNumberAttributes configured", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[1].longName = undefined;
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      suppressEmptyPlaceholdersForChapters: true, // no chapterNumberAttributes -> isRealChapter always false
+    });
+    expect(html).toContain("(sans titre)");
+  });
+
+  it("exposes isChapter on the customAttributeRenderers context for power users who want their own placeholder", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      chapterNumberAttributes: ["ChapterName"],
+      customAttributeRenderers: [
+        {
+          attribute: "ad-name", // arbitrary; we only care about ctx.isChapter here
+          render: (_v, ctx) => (ctx.isChapter ? `<em data-chapter-marker="1"></em>` : undefined),
+        },
+      ],
+    });
+    expect(html).toContain('data-chapter-marker="1"'); // present for so-1 (has ChapterName)
+  });
+});
+
+describe("isTitleless / isContentless (general predicate, not tied to chapters)", () => {
+  it("suppresses '(sans titre)' for a plain paragraph object that has content but is never meant to have a title", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    // so-2 ("Child requirement") -> pretend it's untitled and give it body content to mimic
+    // "a plain paragraph object that has text but no title", independent of any chapter concept.
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[1].longName = undefined;
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      isTitleless: (obj) => obj?.identifier === "so-2",
+    });
+    const so2Start = html.indexOf('id="reqif-obj-so-2"');
+    const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
+    expect(so2Block).not.toContain("(sans titre)");
+    // its sibling so-1 is unaffected and keeps its real title
+    expect(html).toContain(">Parent requirement<");
+  });
+
+  it("does not suppress the content placeholder for a titleless object unless isContentless says so too", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[1].longName = undefined; // so-2: no title, and (in the fixture) no content either
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      isTitleless: (obj) => obj?.identifier === "so-2",
+    });
+    const so2Start = html.indexOf('id="reqif-obj-so-2"');
+    const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
+    expect(so2Block).not.toContain("(sans titre)"); // title suppressed
+    expect(so2Block).toContain("(vide)"); // content placeholder still shown — different concern
+  });
+
+  it("can target objects by SpecObjectType rather than by identifier", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[1].longName = undefined;
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      isTitleless: (_obj, specType) => specType?.longName === "Requirement",
+    });
+    // every object in the fixture uses the "Requirement" SpecObjectType, so all titles are suppressed when present...
+    // so-1 still HAS a real title (LONG-NAME wins over isTitleless, which only governs the *fallback*)
+    expect(html).toContain(">Parent requirement<");
+    // ...but so-2, which has none, no longer shows the placeholder
+    const so2Start = html.indexOf('id="reqif-obj-so-2"');
+    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(sans titre)");
+  });
+
+  it("composes with suppressEmptyPlaceholdersForChapters (either one suppressing is enough)", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specObjects[1].longName = undefined; // so-2: not a chapter, but isTitleless says yes
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
+      chapterNumberAttributes: ["ChapterName"],
+      suppressEmptyPlaceholdersForChapters: true,
+      isTitleless: (obj) => obj?.identifier === "so-2",
+    });
+    const so2Start = html.indexOf('id="reqif-obj-so-2"');
+    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(sans titre)");
+  });
+
+  it("isContentless independently suppresses '(vide)' without affecting the title", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      isContentless: (obj) => obj.identifier === "so-2",
+    });
+    const so2Start = html.indexOf('id="reqif-obj-so-2"');
+    const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
+    expect(so2Block).toContain(">Child requirement<"); // title still shown normally
+    expect(so2Block).not.toContain("(vide)"); // content placeholder suppressed
+  });
+});
+
 describe("synthetic fixture: rendering & sanitization", () => {
   it("escapes/strips dangerous markup and keeps safe formatting", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);

@@ -236,8 +236,49 @@ Seuls les objets portant une valeur non vide pour l'un de ces attributs reçoive
 
 **`readingMode: true`** — pense à un export PDF/Word : seuls les titres et le texte des exigences restent visibles. Concrètement :
 - l'encadré ID, la ligne "Créé par/Modifié par", et le panneau "Détails techniques" disparaissent (le contenu reste accessible par ailleurs via `showTechnicalByDefault`/le panneau technique si vous repassez en mode normal) ;
-- les titres passent de simples lignes en gras à de vraies balises `<h3>`...`<h6>` selon la profondeur (la `Specification` elle-même garde son `<h2>`) — meilleure structure pour la lecture, l'impression ou l'export PDF ;
+- les titres passent de simples lignes en gras à de vraies balises `<h3>`...`<h6>` selon la profondeur (la `Specification` elle-même garde son `<h2>`) — meilleure structure pour la lecture, l'impression ou l'export PDF. Leur taille est fixée explicitement par niveau (`1.3rem` → `0.95rem`) plutôt que de dépendre des tailles par défaut du navigateur, qui se réduisent en cascade à chaque imbrication et finissent par devenir illisibles sur les arborescences profondes ; passé `<h6>`, la taille reste constante (`0.95rem`) au lieu de continuer à rétrécir ;
 - le contenu que *vous* ajoutez via `customAttributeRenderers` reste affiché : seule la métadonnée générée automatiquement est masquée, pas ce que vous avez explicitement demandé.
+
+### Titre ou contenu vide volontaire (pas seulement pour les chapitres)
+
+Pour le cas spécifique des objets "chapitres" (`chapterNumberAttributes`), un raccourci existe :
+
+```ts
+const html = await renderPackageToHtml(pkg, {
+  chapterNumberAttributes: ["ChapterName"],
+  suppressEmptyPlaceholdersForChapters: true, // pas de "(sans titre)"/"(vide)" pour les chapitres uniquement
+});
+```
+
+Mais c'est en réalité un cas particulier d'un besoin plus général : parfois un objet n'est **structurellement pas censé** avoir de titre (un simple paragraphe d'information, par exemple, qui a du texte mais jamais de `LONG-NAME`) — ou inversement, du contenu (un titre de section pur, sans texte directement dessous). Ce ne sont pas des données manquantes à signaler avec "(sans titre)"/"(vide)".
+
+⚠️ **`customAttributeRenderers` ne peut pas résoudre ça** : il n'agit que sur la zone de contenu (avant/après), jamais sur le titre affiché dans l'arborescence (`<summary>`). Pour le titre comme pour le contenu, utilisez plutôt `isTitleless`/`isContentless` — deux fonctions à fournir, indépendantes de toute notion de "chapitre" :
+
+```ts
+const html = await renderPackageToHtml(pkg, {
+  // Par type d'objet : ne jamais signaler l'absence de titre sur un "Paragraph"
+  isTitleless: (obj, specType) => specType?.longName === "Paragraph",
+
+  // Par n'importe quel autre critère (accès à l'attribut de votre choix via les
+  // helpers exportés resolveAttribute/valueToPlainText) :
+  isContentless: (obj, specType, index) => {
+    const { value } = resolveAttribute(obj, index, "ObjectType");
+    return valueToPlainText(value, index) === "Heading";
+  },
+});
+```
+
+- Les deux fonctions sont **indépendantes** : un objet peut être "sans titre attendu" sans être "sans contenu attendu", et inversement (c'est exactement le cas paragraphe-sans-titre vs chapitre-sans-contenu).
+- Elles ne s'appliquent qu'au **repli** : si l'objet a un vrai `LONG-NAME`/contenu, il s'affiche normalement, peu importe ce que ces fonctions renvoient.
+- Elles se combinent avec `suppressEmptyPlaceholdersForChapters` (la suppression a lieu si l'un OU l'autre dit oui).
+- Pour un contrôle encore plus fin (ex. afficher un texte de remplacement personnalisé plutôt que rien), `customAttributeRenderers` reçoit `ctx.isChapter` (vrai si l'objet correspond à `chapterNumberAttributes`, indépendamment des options de suppression) pour bâtir votre propre logique dans la zone de contenu :
+
+```ts
+customAttributeRenderers: [{
+  attribute: "ReqIF.Text",
+  render: (value, ctx) => (!value && ctx.isChapter ? `<span class="chapter-divider">—</span>` : undefined),
+}]
+```
 
 ## Liens entre exigences (SpecRelation)
 

@@ -14,6 +14,8 @@ export interface AttributeRenderContext {
   index: ReqIfIndex;
   /** Resolved attachment lookup (data: URIs), in case your renderer needs an image too. */
   attachments: AttachmentLookup;
+  /** Whether this object qualifies as a "chapter" (per `RenderOptions.chapterNumberAttributes`) — handy for a custom renderer to show its own placeholder for an intentionally empty chapter, distinct from a regular requirement that's actually missing data. */
+  isChapter: boolean;
   /** Looks up another attribute on this same object, by long name or identifier. */
   getValue(attributeNameOrId: string): AttributeValue | undefined;
   /** Looks up another attribute's definition on this same object, by long name or identifier. */
@@ -53,12 +55,14 @@ export function buildAttributeRenderContext(
   index: ReqIfIndex,
   attachments: AttachmentLookup,
   formatValue: (value: AttributeValue | undefined) => string,
+  isChapter: boolean,
 ): AttributeRenderContext {
   return {
     specObject,
     specType,
     index,
     attachments,
+    isChapter,
     getValue: (key) => resolveAttribute(specObject, index, key).value,
     getDefinition: (key) => resolveAttribute(specObject, index, key).definition,
     formatValue,
