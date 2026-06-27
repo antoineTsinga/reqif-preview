@@ -223,6 +223,17 @@ const html = await renderPackageToHtml(pkg, {
 
 **`chapterNumbers: true`** — préfixe chaque titre de sa position dans l'arborescence (`1`, `1.1`, `1.1.1`, `1.1.2`, `1.2`, `2`...). La numérotation repart à 1 à chaque nouvelle `Specification`, comme des documents séparés.
 
+Par défaut, **tous** les nœuds sont numérotés — un peu brutal, puisqu'un document Word ne numérote que ses titres (Heading 1/2/3...), pas chaque paragraphe. Si vos exigences distinguent les "chapitres" structurels des exigences elles-mêmes via un attribut (la convention `ChapterName`/`ReqIF.ChapterName` est courante chez DOORS), restreignez la numérotation à ces seuls nœuds :
+
+```ts
+const html = await renderPackageToHtml(pkg, {
+  chapterNumbers: true,
+  chapterNumberAttributes: ["ChapterName"], // ou ["ReqIF.ChapterName"], selon votre export
+});
+```
+
+Seuls les objets portant une valeur non vide pour l'un de ces attributs reçoivent alors un numéro ; les autres (exigences "feuilles", sans cet attribut) n'en reçoivent aucun et ne décalent pas la numérotation de leurs frères — comme un paragraphe normal entre deux titres Word. Si un nœud non numéroté a lui-même des enfants qui sont des "chapitres", leur numérotation continue depuis le dernier ancêtre numéroté (elle ne redémarre pas à cause du nœud intermédiaire).
+
 **`readingMode: true`** — pense à un export PDF/Word : seuls les titres et le texte des exigences restent visibles. Concrètement :
 - l'encadré ID, la ligne "Créé par/Modifié par", et le panneau "Détails techniques" disparaissent (le contenu reste accessible par ailleurs via `showTechnicalByDefault`/le panneau technique si vous repassez en mode normal) ;
 - les titres passent de simples lignes en gras à de vraies balises `<h3>`...`<h6>` selon la profondeur (la `Specification` elle-même garde son `<h2>`) — meilleure structure pour la lecture, l'impression ou l'export PDF ;

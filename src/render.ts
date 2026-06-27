@@ -115,8 +115,25 @@ export interface RenderOptions {
    * Prefix each requirement's title with a Word-style chapter number
    * (1, 1.1, 1.1.1, 1.1.2, 1.2, 2, ...), restarting at 1 for each
    * Specification. Default: false.
+   *
+   * By default every node in the tree is numbered. Pass
+   * `chapterNumberAttributes` alongside this to only number nodes that are
+   * actually "chapters" (Word-style: headings get numbers, the body text
+   * under them doesn't).
    */
   chapterNumbers?: boolean;
+  /**
+   * Restricts chapter numbering to nodes whose SpecObject carries a non-
+   * empty value for one of these attributes (matched by long name or
+   * identifier — e.g. `["ChapterName"]` or `["ReqIF.ChapterName"]`).
+   * Siblings without a match are simply skipped when counting — like a
+   * plain paragraph between two Word headings, they don't consume a number
+   * and don't break the sequence. Their own children, if any, continue
+   * numbering from the nearest numbered ancestor. Has no effect unless
+   * `chapterNumbers` is also true; if omitted, every node counts (the
+   * simpler, blunter default).
+   */
+  chapterNumberAttributes?: string[];
   /**
    * Strip the metadata chrome (id badge, created/modified line, technical-
    * details panel) and switch headings to a flatter, document-like look —
@@ -191,9 +208,7 @@ export function renderSpecification(
   options: RenderOptions = {},
 ): string {
   const title = escapeHtml(spec.longName || labels.untitled);
-  const nodes = spec.children
-    .map((n, i) => renderHierarchyNode(n, index, attachments, labels, options, [i + 1]))
-    .join("");
+  const nodes = renderHierarchyChildren(spec.children, index, attachments, labels, options, [], 1);
   return `<section class="reqif-spec"><h2 class="reqif-spec-title">${title}</h2><div class="reqif-tree">${nodes}</div></section>`;
 }
 
@@ -239,13 +254,60 @@ function renderHeader(doc: ReqIfDocument, labels: RenderLabels): string {
   return `<header class="reqif-header">${items}</header>`;
 }
 
+
+/** Does this object qualify as a "chapter" for numbering purposes? */
+function isChapterNode(obj: SpecObject | undefined, index: ReqIfIndex, attrs: string[]): boolean {
+  if (!obj) return false;
+  for (const key of attrs) {
+    const { value } = resolveAttribute(obj, index, key);
+    if (value && valueToPlainText(value, index)) return true;
+  }
+  return false;
+}
+
+/**
+ * Renders one set of siblings, handling the chapter-numbering counter for
+ * this level: with `chapterNumberAttributes` set, only matching nodes
+ * consume a number (others are skipped, like body paragraphs between Word
+ * headings — they don't break the sequence, and their own children, if
+ * any, keep numbering from the nearest numbered ancestor).
+ */
+function renderHierarchyChildren(
+  nodes: SpecHierarchy[],
+  index: ReqIfIndex,
+  attachments: AttachmentLookup,
+  labels: RenderLabels,
+  options: RenderOptions,
+  basePath: number[],
+  depth: number,
+): string {
+  const chapterAttrs = options.chapterNumberAttributes;
+  let counter = 0;
+  return nodes
+    .map((node) => {
+      const obj = index.specObjects.get(node.objectRef);
+      const qualifies = !chapterAttrs?.length || isChapterNode(obj, index, chapterAttrs);
+      let displayPath: number[] | undefined;
+      let childBasePath = basePath;
+      if (options.chapterNumbers && qualifies) {
+        counter += 1;
+        displayPath = [...basePath, counter];
+        childBasePath = displayPath;
+      }
+      return renderHierarchyNode(node, index, attachments, labels, options, displayPath, childBasePath, depth);
+    })
+    .join("");
+}
+
 function renderHierarchyNode(
   node: SpecHierarchy,
   index: ReqIfIndex,
   attachments: AttachmentLookup,
   labels: RenderLabels,
   options: RenderOptions,
-  path: number[],
+  displayPath: number[] | undefined,
+  childBasePath: number[],
+  depth: number,
 ): string {
   const obj = index.specObjects.get(node.objectRef);
   const body = obj
@@ -253,16 +315,14 @@ function renderHierarchyNode(
     : `<p class="reqif-missing">${labels.noContent}</p>`;
 
   const rawTitle = resolveTitle(obj, node, index, labels, options.titleAttributes);
-  const numberPrefix = options.chapterNumbers ? path.join(".") + " " : "";
+  const numberPrefix = displayPath ? displayPath.join(".") + " " : "";
   const titleText = numberPrefix + rawTitle;
 
   const titleHtml = options.readingMode
-    ? `<h${headingLevelFor(path.length)} class="reqif-node-heading">${escapeHtml(titleText)}</h${headingLevelFor(path.length)}>`
+    ? `<h${headingLevelFor(depth)} class="reqif-node-heading">${escapeHtml(titleText)}</h${headingLevelFor(depth)}>`
     : escapeHtml(titleText);
 
-  const childrenHtml = node.children
-    .map((c, i) => renderHierarchyNode(c, index, attachments, labels, options, [...path, i + 1]))
-    .join("");
+  const childrenHtml = renderHierarchyChildren(node.children, index, attachments, labels, options, childBasePath, depth + 1);
 
   return (
     `<details class="reqif-node" open>` +

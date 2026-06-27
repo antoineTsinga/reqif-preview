@@ -37,7 +37,7 @@ describe("synthetic fixture: full data-type coverage", () => {
     const sot = index.specTypes.get("sot-req")!;
     expect(sot.specAttributes.map((a) => a.identifier)).toEqual([
       "ad-name","ad-count","ad-ratio","ad-active","ad-due","ad-desc","ad-prio",
-      "ad-foreignid","ad-createdby","ad-createdon","ad-modifiedby","ad-modifiedon","ad-puid",
+      "ad-foreignid","ad-createdby","ad-createdon","ad-modifiedby","ad-modifiedon","ad-puid","ad-chapter",
     ]);
     const nameDef = sot.specAttributes[0];
     const dt = index.datatypeOf(nameDef);
@@ -549,6 +549,39 @@ describe("layout: tabs (multiple documents / specifications)", () => {
     const pkg = await loadReqIfPackage(zipBytes);
     const html = await renderPackageToHtml(pkg, { includeCss: false });
     expect(html).not.toContain('class="reqif-tabs"');
+  });
+});
+
+describe("synthetic fixture: chapterNumberAttributes (chapter-only numbering)", () => {
+  it("numbers every node when chapterNumberAttributes is omitted (blunt default)", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, chapterNumbers: true });
+    expect(html).toContain(">1 Parent requirement<");
+    expect(html).toContain(">1.1 Child requirement<"); // so-2 has no ChapterName but still gets a number here
+  });
+
+  it("only numbers nodes carrying the configured attribute, skipping others without breaking the sequence", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      chapterNumbers: true,
+      chapterNumberAttributes: ["ChapterName"],
+    });
+    // so-1 has ChapterName -> numbered "1"
+    expect(html).toContain(">1 Parent requirement<");
+    // so-2 has NO ChapterName -> no number prefix at all
+    expect(html).toContain(">Child requirement<");
+    expect(html).not.toContain("1.1 Child requirement");
+    // so-3 (grandchild of so-1, child of so-2) DOES have ChapterName -> continues
+    // from the nearest numbered ancestor (so-1's "1"), skipping through so-2 -> "1.1"
+    expect(html).toContain(">1.1 Grandchild requirement<");
+  });
+
+  it("does not number anything when chapterNumbers itself is false, even with chapterNumberAttributes set", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, chapterNumberAttributes: ["ChapterName"] });
+    expect(html).not.toContain("1 Parent requirement");
+    expect(html).toContain(">Parent requirement<");
   });
 });
 
