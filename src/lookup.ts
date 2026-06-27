@@ -29,6 +29,10 @@ export class ReqIfIndex {
   readonly specHierarchies = new Map<Identifier, SpecHierarchy>();
   readonly specRelations = new Map<Identifier, SpecRelation>();
   readonly relationGroups = new Map<Identifier, RelationGroup>();
+  /** SpecRelations where a given SpecObject is the SOURCE, keyed by that object's id. */
+  readonly outgoingRelations = new Map<Identifier, SpecRelation[]>();
+  /** SpecRelations where a given SpecObject is the TARGET, keyed by that object's id. */
+  readonly incomingRelations = new Map<Identifier, SpecRelation[]>();
 
   constructor(doc: ReqIfDocument) {
     const c = doc.coreContent;
@@ -47,7 +51,11 @@ export class ReqIfIndex {
       this.specifications.set(s.identifier, s);
       this.indexHierarchy(s.children);
     }
-    for (const r of c.specRelations) this.specRelations.set(r.identifier, r);
+    for (const r of c.specRelations) {
+      this.specRelations.set(r.identifier, r);
+      pushTo(this.outgoingRelations, r.sourceRef, r);
+      pushTo(this.incomingRelations, r.targetRef, r);
+    }
     for (const g of c.specRelationGroups) this.relationGroups.set(g.identifier, g);
   }
 
@@ -67,4 +75,10 @@ export class ReqIfIndex {
   enumLabels(valueRefs: Identifier[]): string[] {
     return valueRefs.map((id) => this.enumValues.get(id)?.longName ?? id);
   }
+}
+
+function pushTo<K>(map: Map<K, SpecRelation[]>, key: K, value: SpecRelation): void {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
 }

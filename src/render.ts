@@ -25,6 +25,7 @@ import type {
   ReqIfPackage,
   SpecHierarchy,
   SpecObject,
+  SpecRelation,
   SpecType,
   Specification,
   XhtmlContent,
@@ -48,6 +49,9 @@ export interface RenderLabels {
   createdOnLabel: string;
   modifiedByLabel: string;
   modifiedOnLabel: string;
+  relationsLabel: string;
+  relationFallbackType: string;
+  relationUnresolved: string;
 }
 
 const DEFAULT_LABELS: RenderLabels = {
@@ -66,6 +70,9 @@ const DEFAULT_LABELS: RenderLabels = {
   createdOnLabel: "Créé le",
   modifiedByLabel: "Modifié par",
   modifiedOnLabel: "Modifié le",
+  relationsLabel: "Liens",
+  relationFallbackType: "Relation",
+  relationUnresolved: "(objet non trouvé)",
 };
 
 export interface RenderOptions {
@@ -134,6 +141,14 @@ export interface RenderOptions {
    * simpler, blunter default).
    */
   chapterNumberAttributes?: string[];
+  /**
+   * Show each object's incoming/outgoing SpecRelations (traceability links
+   * to other requirements), with a same-page anchor link when the related
+   * object is rendered in the same output. Default: true — unlike the
+   * author/date metadata, links to other requirements are usually content
+   * worth keeping even in `readingMode`.
+   */
+  showRelations?: boolean;
   /**
    * Strip the metadata chrome (id badge, created/modified line, technical-
    * details panel) and switch headings to a flatter, document-like look —
@@ -254,6 +269,10 @@ function renderHeader(doc: ReqIfDocument, labels: RenderLabels): string {
   return `<header class="reqif-header">${items}</header>`;
 }
 
+/** Stable, sanitized anchor id for a SpecObject, used by relation links. */
+function domId(identifier: string): string {
+  return "reqif-obj-" + identifier.replace(/[^A-Za-z0-9_-]/g, "_");
+}
 
 /** Does this object qualify as a "chapter" for numbering purposes? */
 function isChapterNode(obj: SpecObject | undefined, index: ReqIfIndex, attrs: string[]): boolean {
@@ -323,9 +342,10 @@ function renderHierarchyNode(
     : escapeHtml(titleText);
 
   const childrenHtml = renderHierarchyChildren(node.children, index, attachments, labels, options, childBasePath, depth + 1);
+  const idAttr = obj ? ` id="${escapeAttr(domId(obj.identifier))}"` : "";
 
   return (
-    `<details class="reqif-node" open>` +
+    `<details class="reqif-node" open${idAttr}>` +
     `<summary class="reqif-node-title">${titleHtml}</summary>` +
     `<div class="reqif-node-body">${body}</div>` +
     (childrenHtml ? `<div class="reqif-node-children">${childrenHtml}</div>` : "") +
@@ -405,13 +425,59 @@ function renderSimpleView(
   const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx);
 
   const contentHtml = resolveContentHtml(obj, index, attachments, labels, lifecycle, options.contentAttributes);
+  const relationsHtml = options.showRelations === false ? "" : renderRelations(obj, index, labels);
 
   return (
     idHtml +
     metaHtml +
     before +
     (contentHtml || `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`) +
-    after
+    after +
+    relationsHtml
+  );
+}
+
+/**
+ * Lists an object's incoming/outgoing SpecRelations (traceability links).
+ * Each related object becomes a same-page anchor link when it's rendered
+ * somewhere in the same output (see `domId`); otherwise its title/id is
+ * still shown, just not as a link.
+ */
+function renderRelations(obj: SpecObject, index: ReqIfIndex, labels: RenderLabels): string {
+  const outgoing = index.outgoingRelations.get(obj.identifier) ?? [];
+  const incoming = index.incomingRelations.get(obj.identifier) ?? [];
+  if (outgoing.length === 0 && incoming.length === 0) return "";
+
+  const rows: string[] = [];
+  for (const rel of outgoing) rows.push(renderRelationRow("\u2192", rel, index.specObjects.get(rel.targetRef), index, labels));
+  for (const rel of incoming) rows.push(renderRelationRow("\u2190", rel, index.specObjects.get(rel.sourceRef), index, labels));
+
+  return (
+    `<div class="reqif-relations">` +
+    `<div class="reqif-relations-label">${escapeHtml(labels.relationsLabel)}</div>` +
+    rows.join("") +
+    `</div>`
+  );
+}
+
+function renderRelationRow(
+  arrow: string,
+  relation: SpecRelation,
+  other: SpecObject | undefined,
+  index: ReqIfIndex,
+  labels: RenderLabels,
+): string {
+  const typeName = index.specTypes.get(relation.typeRef)?.longName ?? labels.relationFallbackType;
+  const otherLabel = other?.longName || other?.identifier || labels.relationUnresolved;
+  const target = other
+    ? `<a class="reqif-relation-target" href="#${escapeAttr(domId(other.identifier))}">${escapeHtml(otherLabel)}</a>`
+    : `<span class="reqif-relation-target reqif-relation-unresolved">${escapeHtml(otherLabel)}</span>`;
+  return (
+    `<div class="reqif-relation">` +
+    `<span class="reqif-relation-arrow">${arrow}</span>` +
+    `<span class="reqif-relation-type">${escapeHtml(typeName)}</span>` +
+    target +
+    `</div>`
   );
 }
 
@@ -678,6 +744,14 @@ const DEFAULT_CSS = `
 .reqif-meta-role { color: #888; }
 .reqif-meta-chip time { color: #666; }
 .reqif-custom-attr { font-size: 14px; contain: layout; }
+.reqif-relations { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e8e8e8; display: flex; flex-direction: column; gap: 4px; }
+.reqif-relations-label { font-size: 11px; text-transform: uppercase; letter-spacing: .02em; color: #999; }
+.reqif-relation { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+.reqif-relation-arrow { color: #999; }
+.reqif-relation-type { color: #666; font-style: italic; }
+.reqif-relation-target { color: #0b62d6; text-decoration: none; }
+.reqif-relation-target:hover { text-decoration: underline; }
+.reqif-relation-unresolved { color: #aaa; font-style: italic; text-decoration: none; }
 
 /* Tabs (CSS-only, see tabs.ts) */
 .reqif-tab-input { position: absolute; opacity: 0; pointer-events: none; }

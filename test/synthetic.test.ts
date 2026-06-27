@@ -585,6 +585,62 @@ describe("synthetic fixture: chapterNumberAttributes (chapter-only numbering)", 
   });
 });
 
+describe("synthetic fixture: spec relations (liaisons)", () => {
+  it("shows an object's outgoing relation with the type's long name and a same-page anchor link", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    // so-2 --(Derives From)--> so-1
+    expect(html).toContain('<div class="reqif-relations">');
+    expect(html).toContain("Derives From");
+    expect(html).toMatch(/<a class="reqif-relation-target" href="#reqif-obj-so-1">Parent requirement<\/a>/);
+  });
+
+  it("shows the matching incoming relation on the target object, with the reverse arrow", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).toContain('id="reqif-obj-so-1"');
+    expect(html).toMatch(/<a class="reqif-relation-target" href="#reqif-obj-so-2">Child requirement<\/a>/);
+  });
+
+  it("does not render a relations block for objects with no relations at all", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    // so-3 has no relations; its body shouldn't carry a reqif-relations block right after it.
+    const so3Index = html.indexOf("Grandchild requirement");
+    const nextRelations = html.indexOf("reqif-relations", so3Index);
+    const nextNode = html.indexOf("reqif-node-children", so3Index);
+    // either no more relations block at all after so-3, or it belongs to an earlier node
+    expect(nextRelations === -1 || (nextNode !== -1 && nextRelations > nextNode)).toBe(true);
+  });
+
+  it("can be hidden with showRelations: false", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, showRelations: false });
+    expect(html).not.toContain('class="reqif-relations"');
+  });
+
+  it("stays visible by default even in readingMode (it's content, not metadata chrome)", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, readingMode: true });
+    expect(html).toContain('class="reqif-relations"');
+  });
+
+  it("falls back to a plain (non-link) label when the related object can't be resolved", () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specRelations.push({
+      identifier: "sr-broken",
+      values: [],
+      typeRef: "srt-derives",
+      sourceRef: "so-1",
+      targetRef: "does-not-exist",
+    });
+    const index = new ReqIfIndex(doc);
+    const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {});
+    expect(html).toContain("reqif-relation-unresolved");
+    expect(html).toContain("objet non trouvé");
+  });
+});
+
 describe("synthetic fixture: rendering & sanitization", () => {
   it("escapes/strips dangerous markup and keeps safe formatting", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);

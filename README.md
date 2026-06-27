@@ -239,6 +239,25 @@ Seuls les objets portant une valeur non vide pour l'un de ces attributs reçoive
 - les titres passent de simples lignes en gras à de vraies balises `<h3>`...`<h6>` selon la profondeur (la `Specification` elle-même garde son `<h2>`) — meilleure structure pour la lecture, l'impression ou l'export PDF ;
 - le contenu que *vous* ajoutez via `customAttributeRenderers` reste affiché : seule la métadonnée générée automatiquement est masquée, pas ce que vous avez explicitement demandé.
 
+## Liens entre exigences (SpecRelation)
+
+Les liens typés entre exigences (`SpecRelation` — ex. "dérive de", "satisfait", "trace vers") sont affichés automatiquement pour chaque objet qui en possède : ses liens **sortants** (`→`) et **entrants** (`←`), avec le nom du type de relation et un lien d'ancrage vers l'objet lié **si celui-ci est rendu dans la même page** :
+
+```html
+<div class="reqif-relations">
+  <div class="reqif-relations-label">Liens</div>
+  <div class="reqif-relation"><span>→</span> <span>Dérive de</span> <a href="#reqif-obj-...">Exigence système — Authentification</a></div>
+</div>
+```
+
+Si l'objet lié n'est pas trouvé (relation vers un objet absent du document, ou rendu dans un autre onglet), le libellé s'affiche quand même, sans lien cliquable. C'est visible par défaut, y compris en `readingMode` (un lien de traçabilité est du contenu à part entière, pas de la métadonnée technique) :
+
+```ts
+const html = await renderPackageToHtml(pkg, { showRelations: false }); // pour le masquer
+```
+
+**Limite actuelle** : seules les `SpecRelation` (liens objet-à-objet) sont affichées. Les `RelationGroup` (regroupements de relations entre deux `Specification`) sont parsées (`doc.coreContent.specRelationGroups`) mais pas encore rendues — exploitables directement via le modèle de données si besoin.
+
 ## Sécurité
 
 Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'un tiers. `renderXhtmlContent` applique une liste blanche stricte de balises/attributs (alignée sur les modules XHTML autorisés par la spec : Text, List, Hypertext, Edit, Presentation, Basic Tables, Object, Style Attribute) :

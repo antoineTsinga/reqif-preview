@@ -80,6 +80,9 @@ export const SYNTHETIC_REQIF = `<?xml version="1.0" encoding="UTF-8"?>
         <SPECIFICATION-TYPE IDENTIFIER="spt-1" LONG-NAME="Spec Type">
           <SPEC-ATTRIBUTES/>
         </SPECIFICATION-TYPE>
+        <SPEC-RELATION-TYPE IDENTIFIER="srt-derives" LONG-NAME="Derives From">
+          <SPEC-ATTRIBUTES/>
+        </SPEC-RELATION-TYPE>
       </SPEC-TYPES>
       <SPEC-OBJECTS>
         <SPEC-OBJECT IDENTIFIER="so-1" LONG-NAME="Parent requirement" LAST-CHANGE="2024-01-15T10:00:00.000+01:00">
@@ -150,6 +153,14 @@ export const SYNTHETIC_REQIF = `<?xml version="1.0" encoding="UTF-8"?>
           </VALUES>
           <TYPE><SPEC-OBJECT-TYPE-REF>sot-req</SPEC-OBJECT-TYPE-REF></TYPE>
         </SPEC-OBJECT>
+        <SPEC-OBJECT IDENTIFIER="so-3" LONG-NAME="Grandchild requirement">
+          <VALUES>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="Chapter Two">
+              <DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>ad-chapter</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+          </VALUES>
+          <TYPE><SPEC-OBJECT-TYPE-REF>sot-req</SPEC-OBJECT-TYPE-REF></TYPE>
+        </SPEC-OBJECT>
       </SPEC-OBJECTS>
       <SPECIFICATIONS>
         <SPECIFICATION IDENTIFIER="spec-1" LONG-NAME="Demo Specification">
@@ -161,14 +172,25 @@ export const SYNTHETIC_REQIF = `<?xml version="1.0" encoding="UTF-8"?>
               <CHILDREN>
                 <SPEC-HIERARCHY IDENTIFIER="sh-2">
                   <OBJECT><SPEC-OBJECT-REF>so-2</SPEC-OBJECT-REF></OBJECT>
-                  <CHILDREN/>
+                  <CHILDREN>
+                    <SPEC-HIERARCHY IDENTIFIER="sh-3">
+                      <OBJECT><SPEC-OBJECT-REF>so-3</SPEC-OBJECT-REF></OBJECT>
+                      <CHILDREN/>
+                    </SPEC-HIERARCHY>
+                  </CHILDREN>
                 </SPEC-HIERARCHY>
               </CHILDREN>
             </SPEC-HIERARCHY>
           </CHILDREN>
         </SPECIFICATION>
       </SPECIFICATIONS>
-      <SPEC-RELATIONS/>
+      <SPEC-RELATIONS>
+        <SPEC-RELATION IDENTIFIER="sr-1">
+          <SOURCE><SPEC-OBJECT-REF>so-2</SPEC-OBJECT-REF></SOURCE>
+          <TARGET><SPEC-OBJECT-REF>so-1</SPEC-OBJECT-REF></TARGET>
+          <TYPE><SPEC-RELATION-TYPE-REF>srt-derives</SPEC-RELATION-TYPE-REF></TYPE>
+        </SPEC-RELATION>
+      </SPEC-RELATIONS>
       <SPEC-RELATION-GROUPS/>
     </REQ-IF-CONTENT>
   </CORE-CONTENT>
