@@ -803,7 +803,7 @@ const DEFAULT_CSS = `
 .reqif-technical[open] > .reqif-technical-toggle { background: #e0ebfb; border-color: #b6d0f5; }
 .reqif-technical .reqif-attrs { margin-top: 10px; }
 .reqif-meta-strip { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; }
-.reqif-meta-chip { display: inline-flex; align-items: center; gap: 4px; background: #f5f5f5; border-radius: 6px; padding: 2px 8px; color: #444; }
+.reqif-meta-chip { display: inline-flex; align-items: center; gap: 4px; background: #f5f5f5; border-radius: 6px; padding: 2px 8px; color: #444; white-space: nowrap; max-width: 100%; }
 .reqif-meta-role { color: #888; }
 .reqif-meta-chip time { color: #666; }
 .reqif-custom-attr { font-size: 14px; contain: layout; }

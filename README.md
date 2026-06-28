@@ -4,6 +4,8 @@ Bibliothèque **indépendante de tout framework** pour parser et prévisualiser 
 
 Fonctionne aussi bien dans le navigateur (bundlé par Vite/Webpack/etc., ou via `<script type="module">`) que côté Node.js (SSR, CLI, traitement batch). Zéro dépendance à React/Vue/Angular — vous récupérez soit un **modèle de données typé**, soit du **HTML prêt à afficher** (`innerHTML`), et vous l'intégrez où vous voulez.
 
+📖 **[docs/index.html](./docs/index.html)** — page de documentation interactive : chaque exemple ci-dessous y est du vrai HTML rendu en direct par la bibliothèque (pas des captures d'écran). Ouvrez-la simplement dans un navigateur.
+
 ## Installation
 
 ```bash
