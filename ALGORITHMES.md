@@ -173,6 +173,14 @@ La profondeur de récursion JS correspond ici directement à la profondeur de l'
 
 ## 4. Conversion du contenu XHTML
 
+### Deux contenus, pas un
+
+Une `AttributeValueXHTML` porte **deux** contenus (clause 10.8.20) : `theValue`, et `theOriginalValue` qui conserve la mise en forme d'origine lorsqu'un outil de la chaîne d'échange n'a pas su l'interpréter et a stocké une copie dégradée à la place, en posant `isSimplified`. Les deux sont parsés, les deux sont scannés par `collectAllXhtmlContents` — une image référencée uniquement par l'original ne serait sinon jamais résolue en `data:` URI.
+
+`displayXhtml` (`render.ts`) tranche lequel afficher : l'original dès qu'il existe, puisque cette bibliothèque rend le sous-ensemble XHTML complet de la spec et n'a donc pas la déficience que le drapeau signale. `preferSimplifiedXhtml` rétablit l'autre choix. `valueToPlainText`, lui, lit *toujours* l'original : une simplification peut avoir perdu du texte, et l'extraction veut la source la plus complète.
+
+*Cas laissé de côté* : un `<DEFAULT-VALUE>` de `AttributeDefinitionXHTML` enveloppe une `ATTRIBUTE-VALUE-XHTML` complète, qui pourrait donc théoriquement porter son propre `<THE-ORIGINAL-VALUE>`. Le parseur ne lit que son `<THE-VALUE>`. Aucun export observé ne fait ça.
+
 Le contenu XHTML traverse **deux représentations distinctes**, jamais une seule :
 
 1. **`XNode`** (interne, propre à `fast-xml-parser`, jamais exposé dans l'API publique)
@@ -198,7 +206,12 @@ function xNodeToXhtml(node: XNode): XhtmlNode {
 
 ## 5. Indexation et résolution des références croisées
 
-`ReqIfIndex` (`lookup.ts`) construit, **en un seul passage O(n)** sur le document, **onze** `Map`. Neuf sont des index d'identité `Map<Identifier, T>` couvrant chaque famille d'éléments identifiables (types de données, types de spec, définitions d'attributs, valeurs d'énumération, objets, spécifications, nœuds de hiérarchie, relations, groupes de relations) ; les deux dernières sont des index **inversés** `Map<Identifier, SpecRelation[]>` pour les liens entrants/sortants (voir section 8) — la clé n'y est pas l'identifiant de la relation mais celui de l'objet à son extrémité, et la valeur est un tableau :
+`ReqIfIndex` (`lookup.ts`) construit, **en un seul passage O(n)**, **douze** `Map`. Neuf sont des index d'identité `Map<Identifier, T>` couvrant chaque famille d'éléments identifiables (types de données, types de spec, définitions d'attributs, valeurs d'énumération, objets, spécifications, nœuds de hiérarchie, relations, groupes de relations) ; les deux dernières sont des index **inversés** `Map<Identifier, SpecRelation[]>` pour les liens entrants/sortants (voir section 8) — la clé n'y est pas l'identifiant de la relation mais celui de l'objet à son extrémité, et la valeur est un tableau ; la douzième, `byAlternativeId`, indexe les éléments par leur `ALTERNATIVE-ID` quand ils en portent un.
+
+**Le constructeur accepte un document ou un tableau de documents.** Ce n'est pas une commodité : les règles de production (clause 11, règle 5b) typent `SOURCE`/`TARGET` d'une `SpecRelation` en `GLOBAL-REF`, donc une relation peut légalement viser un objet d'un *autre* `.reqif` du même `.reqifz`. `renderPackageToHtml` construit donc un index unique sur `pkg.documents` et le transmet à chaque `renderDocumentToHtml` (4ᵉ paramètre optionnel). Un index par document ne résoudrait jamais ces relations.
+
+**`byAlternativeId` ne participe pas à la résolution.** La clause 2 autorise un outil à faire tourner un mécanisme d'identification alternatif *en parallèle* du principal, mais mélanger silencieusement deux espaces d'identifiants serait pire que ne pas résoudre. La carte est peuplée, à la disposition d'un consommateur qui sait que son exportateur procède ainsi.
+
 
 ```ts
 constructor(doc: ReqIfDocument) {
@@ -478,7 +491,7 @@ Avec *n* = nombre total de nœuds XML du document, *m* = nombre de pièces joint
 |---|---|---|
 | Parsing XML (`fast-xml-parser`) | O(n) | un seul passage linéaire |
 | Construction du modèle (`parse-document.ts`) | O(n) | un passage récursif, miroir direct de l'arbre source |
-| Construction de `ReqIfIndex` | O(n) | un passage, 11 insertions de Map par élément au pire |
+| Construction de `ReqIfIndex` | O(n) | un passage, 12 insertions de Map par élément au pire |
 | Résolution d'une référence (`typeRef`, etc.) | O(1) amorti | lookup de `Map` |
 | Collecte des chemins de pièces jointes | O(n) | un passage sur toutes les valeurs XHTML |
 | Résolution des pièces jointes | O(m) en parallèle | `Promise.all`, borné par la I/O la plus lente, pas la somme |
@@ -491,6 +504,8 @@ Aucune étape n'est quadratique : il n'y a jamais de recherche linéaire imbriqu
 ---
 
 ## 12. Philosophie générale : fail-safe partout
+
+> Depuis l'ajout de `diagnostics.ts`, chacune des dégradations listées ci-dessous émet un `DegradationEvent` si l'appelant fournit `onDegradation`. Le rendu est identique au bit près avec ou sans handler — l'option ne fait que rendre observable une décision déjà prise. Un handler qui lève est intercepté : un canal de diagnostic capable de casser ce qu'il observe serait pire que pas de canal.
 
 Un fil conducteur traverse tout le code : **une donnée d'entrée surprenante (document malformé, attribut d'un type inattendu, fonction de rendu personnalisée buguée) ne doit jamais faire planter tout le rendu — au pire, elle dégrade localement.**
 
