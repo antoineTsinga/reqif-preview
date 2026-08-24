@@ -375,11 +375,16 @@ function parseAttributeValue(node: XNode): AttributeValue {
       return { kind, definitionRef, value: a["THE-VALUE"] };
     case "XHTML": {
       const theValueEl = findFirst(node, "THE-VALUE");
+      // 10.8.20: when an upstream tool had to degrade the formatting it keeps
+      // the untouched original alongside. Losing it means showing a poorer
+      // rendition than the file actually carries.
+      const originalEl = findFirst(node, "THE-ORIGINAL-VALUE");
       return {
         kind,
         definitionRef,
         isSimplified: parseBool(a["IS-SIMPLIFIED"]),
         value: theValueEl ? xNodesToXhtmlContent(childrenOf(theValueEl)) : undefined,
+        originalValue: originalEl ? xNodesToXhtmlContent(childrenOf(originalEl)) : undefined,
       };
     }
     case "ENUMERATION":

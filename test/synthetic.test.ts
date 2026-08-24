@@ -9,6 +9,8 @@ import {
   ReqIfIndex,
   extractLifecycleInfo,
   xhtmlToPlainText,
+  resolveAttribute,
+  valueToPlainText,
 } from "../src/index.js";
 import { SYNTHETIC_REQIF, TINY_PNG_BASE64 } from "./fixtures.js";
 
@@ -923,5 +925,90 @@ describe("AlternativeID (10.8.2)", () => {
       parseReqIfXml(docWithAltIds(`<ALTERNATIVE-ID><ALTERNATIVE-ID/></ALTERNATIVE-ID>`)).coreContent
         .specObjects[0].alternativeId,
     ).toBeUndefined();
+  });
+});
+
+describe("AttributeValueXHTML: theOriginalValue (10.8.20)", () => {
+  function docWithXhtml(theValue: string, original?: string, isSimplified = true): string {
+    const flag = isSimplified ? ` IS-SIMPLIFIED="true"` : "";
+    const originalEl = original ? `<THE-ORIGINAL-VALUE>${original}</THE-ORIGINAL-VALUE>` : "";
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-XHTML IDENTIFIER="dt-x" LONG-NAME="X"/></DATATYPES>
+    <SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES>
+      <ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="a1" LONG-NAME="ReqIF.Text"><TYPE><DATATYPE-DEFINITION-XHTML-REF>dt-x</DATATYPE-DEFINITION-XHTML-REF></TYPE></ATTRIBUTE-DEFINITION-XHTML>
+    </SPEC-ATTRIBUTES></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1" LONG-NAME="Req"><VALUES>
+      <ATTRIBUTE-VALUE-XHTML${flag}>
+        <DEFINITION><ATTRIBUTE-DEFINITION-XHTML-REF>a1</ATTRIBUTE-DEFINITION-XHTML-REF></DEFINITION>
+        <THE-VALUE>${theValue}</THE-VALUE>
+        ${originalEl}
+      </ATTRIBUTE-VALUE-XHTML>
+    </VALUES><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE></SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS><SPECIFICATION IDENTIFIER="s1" LONG-NAME="Spec"><CHILDREN>
+      <SPEC-HIERARCHY IDENTIFIER="sh1"><OBJECT><SPEC-OBJECT-REF>o1</SPEC-OBJECT-REF></OBJECT></SPEC-HIERARCHY>
+    </CHILDREN></SPECIFICATION></SPECIFICATIONS>
+    <SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+  }
+
+  const SIMPLE = `<xhtml:div>Flattened fallback</xhtml:div>`;
+  const RICH = `<xhtml:div>Rich <xhtml:b>original</xhtml:b> text</xhtml:div>`;
+
+  it("parses THE-ORIGINAL-VALUE alongside THE-VALUE", () => {
+    const doc = parseReqIfXml(docWithXhtml(SIMPLE, RICH));
+    const value = doc.coreContent.specObjects[0].values[0];
+    expect(value.kind).toBe("XHTML");
+    if (value.kind !== "XHTML") throw new Error("expected an XHTML value");
+    expect(value.isSimplified).toBe(true);
+    expect(xhtmlToPlainText(value.value!)).toBe("Flattened fallback");
+    expect(xhtmlToPlainText(value.originalValue!)).toBe("Rich original text");
+  });
+
+  it("renders the original rather than the simplified stand-in by default", async () => {
+    const pkg = await loadReqIfPackage(docWithXhtml(SIMPLE, RICH));
+    const html = await renderPackageToHtml(pkg);
+    expect(html).toContain("Rich <b>original</b> text");
+    expect(html).not.toContain("Flattened fallback");
+  });
+
+  it("renders the simplified stand-in when preferSimplifiedXhtml is set", async () => {
+    const pkg = await loadReqIfPackage(docWithXhtml(SIMPLE, RICH));
+    const html = await renderPackageToHtml(pkg, { preferSimplifiedXhtml: true });
+    expect(html).toContain("Flattened fallback");
+    expect(html).not.toContain("Rich <b>original</b> text");
+  });
+
+  it("leaves values without an original untouched", async () => {
+    const pkg = await loadReqIfPackage(docWithXhtml(SIMPLE, undefined, false));
+    const doc = parseReqIfXml(docWithXhtml(SIMPLE, undefined, false));
+    const value = doc.coreContent.specObjects[0].values[0];
+    if (value.kind !== "XHTML") throw new Error("expected an XHTML value");
+    expect(value.originalValue).toBeUndefined();
+    expect(await renderPackageToHtml(pkg)).toContain("Flattened fallback");
+  });
+
+  it("resolves an attachment referenced only by the original value", async () => {
+    const withImage = docWithXhtml(
+      SIMPLE,
+      `<xhtml:div>See <xhtml:object data="diagram.png" type="image/png">alt</xhtml:object></xhtml:div>`,
+    );
+    const zipBytes = zipSync({
+      "model.reqif": strToU8(withImage),
+      "diagram.png": base64ToBytes(TINY_PNG_BASE64),
+    });
+    const pkg = await loadReqIfPackage(zipBytes);
+    const html = await renderPackageToHtml(pkg);
+    expect(html).toMatch(/<img src="data:image\/png;base64,[A-Za-z0-9+/=]+"/);
+  });
+
+  it("extracts plain text from the original, which may carry text the simplification dropped", () => {
+    const doc = parseReqIfXml(docWithXhtml(`<xhtml:div>Only a stub</xhtml:div>`, RICH));
+    const index = new ReqIfIndex(doc);
+    const { value } = resolveAttribute(doc.coreContent.specObjects[0], index, "ReqIF.Text");
+    expect(valueToPlainText(value!, index)).toBe("Rich original text");
   });
 });

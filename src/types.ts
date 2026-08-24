@@ -222,7 +222,16 @@ export interface AttributeValueString extends AttributeValueBase {
 }
 export interface AttributeValueXhtml extends AttributeValueBase {
   kind: "XHTML";
+  /** 10.8.20 theValue — the content to display, possibly a degraded copy. */
   value?: XhtmlContent;
+  /**
+   * 10.8.20 theOriginalValue — the pre-simplification content. A tool in the
+   * exchange chain that could not interpret the original formatting replaces
+   * `value` with a simplified rendition, sets `isSimplified`, and preserves
+   * the real one here so that a downstream tool can recover it.
+   */
+  originalValue?: XhtmlContent;
+  /** True when `value` is a simplified stand-in for `originalValue`. */
   isSimplified?: boolean;
 }
 export interface AttributeValueEnumeration extends AttributeValueBase {

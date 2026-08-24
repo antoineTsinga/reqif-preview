@@ -75,6 +75,22 @@ const html = await renderPackageToHtml(pkg, {
 - `titleAttributes` : n'intervient qu'en dernier recours, après le `LONG-NAME` de l'objet et celui de son nœud d'arborescence (jamais à leur place) — pratique pour les exports DOORS où le vrai libellé est parfois dans un attribut personnalisé plutôt que dans le champ structurel.
 - Dans les deux cas, les attributs visés restent aussi visibles dans le panneau technique (qui, lui, n'est jamais filtré).
 
+### Texte simplifié en cours de route (`isSimplified`)
+
+Quand un outil de la chaîne d'échange ne sait pas interpréter la mise en forme d'un attribut XHTML, la spec (clause 10.8.20) lui demande de remplacer le contenu par une version simplifiée, de poser `IS-SIMPLIFIED="true"`, et de **conserver l'original** dans `<THE-ORIGINAL-VALUE>`.
+
+`reqif-preview` rend le sous-ensemble XHTML complet autorisé par la spec — il n'a donc pas la déficience que ce drapeau signale. **Par défaut il affiche l'original**, plus fidèle que la version dégradée :
+
+```ts
+// Comportement par défaut : l'original s'il existe, sinon le contenu simplifié.
+const html = await renderPackageToHtml(pkg);
+
+// Pour reproduire ce que verrait un outil limité :
+const html = await renderPackageToHtml(pkg, { preferSimplifiedXhtml: true });
+```
+
+Les deux contenus sont exposés dans le modèle (`value.value` et `value.originalValue`), et les pièces jointes référencées par l'un comme par l'autre sont résolues. `xhtmlToPlainText`/`valueToPlainText` lisent toujours l'original quand il existe : une simplification peut avoir *perdu* du texte (un tableau aplati, une liste écrasée), et l'extraction de texte veut la source la plus complète.
+
 ### Afficher un contenu personnalisé (ex. un ID métier comme PUID)
 
 `ReqIF.ForeignID` couvre le cas standard, mais beaucoup d'outils stockent leur identifiant métier dans un attribut au nom libre (ex. `IE PUID` chez DOORS, parfois en XHTML plutôt qu'en chaîne simple). Pour ces cas, enregistrez un **rendu personnalisable** : la fonction reçoit la valeur déjà résolue de l'attribut ciblé, plus un contexte qui donne accès à *tous* les autres attributs de l'objet (pour croiser plusieurs valeurs si besoin), et son HTML est injecté juste avant ou juste après le texte principal, au choix :

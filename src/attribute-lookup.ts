@@ -54,8 +54,14 @@ export function valueToPlainText(value: AttributeValue, index?: ReqIfIndex): str
       return value.value === undefined ? undefined : String(value.value);
     case "BOOLEAN":
       return value.value === undefined ? undefined : value.value ? "true" : "false";
-    case "XHTML":
-      return value.value ? asString(xhtmlToPlainText(value.value)) : undefined;
+    case "XHTML": {
+      // Always read from the original when one is present: a simplified
+      // rendition may have *dropped* text (a flattened table, a lost list),
+      // and plain-text extraction wants the most complete source available.
+      // This is independent of what the renderer chooses to display.
+      const content = value.originalValue ?? value.value;
+      return content ? asString(xhtmlToPlainText(content)) : undefined;
+    }
     case "ENUMERATION": {
       const labels = index ? index.enumLabels(value.valueRefs) : value.valueRefs;
       return labels.length ? labels.join(", ") : undefined;

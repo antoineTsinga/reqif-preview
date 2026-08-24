@@ -21,6 +21,7 @@ import type {
   AttachmentResolver,
   AttributeDefinition,
   AttributeValue,
+  AttributeValueXhtml,
   ReqIfDocument,
   ReqIfPackage,
   SpecHierarchy,
@@ -185,6 +186,15 @@ export interface RenderOptions {
    */
   showRelations?: boolean;
   /**
+   * Display the simplified rendition of an XHTML value rather than the
+   * original it stands in for (10.8.20 `theOriginalValue`). Default: false —
+   * this renderer handles the full XHTML subset the spec allows, so it does
+   * not have the interpretation deficiency `isSimplified` signals, and the
+   * original is the more faithful thing to show. Set this to reproduce what
+   * a limited downstream tool would see.
+   */
+  preferSimplifiedXhtml?: boolean;
+  /**
    * Strip the metadata chrome (id badge, created/modified line, technical-
    * details panel) and switch headings to a flatter, document-like look —
    * for a clean reading view closer to a Word document, where only titles
@@ -302,6 +312,18 @@ function renderHeader(doc: ReqIfDocument, labels: RenderLabels): string {
     )
     .join("");
   return `<header class="reqif-header">${items}</header>`;
+}
+
+/**
+ * Which of an XHTML value's two contents to render. A tool in the exchange
+ * chain that could not interpret the original formatting stores a degraded
+ * copy in `value` and preserves the real one in `originalValue` (10.8.20 §3).
+ * We render the full XHTML subset, so the original is what the reader should
+ * see; its mere presence is the signal that something was degraded.
+ */
+function displayXhtml(value: AttributeValueXhtml, options: RenderOptions): XhtmlContent | undefined {
+  if (options.preferSimplifiedXhtml) return value.value;
+  return value.originalValue ?? value.value;
 }
 
 /** Stable, sanitized anchor id for a SpecObject, used by relation links. */
@@ -481,12 +503,12 @@ function renderSimpleView(
   const metaHtml = options.readingMode ? "" : renderLifecycleMeta(lifecycle, labels, dateLocale);
 
   const formatValue = (value: AttributeValue | undefined) =>
-    value ? renderAttributeValue(value, index, attachments, labels) : "";
+    value ? renderAttributeValue(value, index, attachments, labels, options) : "";
   const ctx = buildAttributeRenderContext(obj, specType, index, attachments, formatValue, isChapter);
   const before = renderCustomAttributes(options.customAttributeRenderers, "before", ctx);
   const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx);
 
-  const contentHtml = resolveContentHtml(obj, index, attachments, labels, lifecycle, options.contentAttributes);
+  const contentHtml = resolveContentHtml(obj, index, attachments, labels, lifecycle, options);
   const relationsHtml = options.showRelations === false ? "" : renderRelations(obj, index, labels);
   const emptyContentHtml = suppressContent ? "" : `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`;
 
@@ -559,31 +581,35 @@ function resolveContentHtml(
   attachments: AttachmentLookup,
   labels: RenderLabels,
   lifecycle: ReturnType<typeof extractLifecycleInfo>,
-  contentAttributes: string[] | undefined,
+  options: RenderOptions,
 ): string {
+  const contentAttributes = options.contentAttributes;
   if (contentAttributes) {
     const parts: string[] = [];
     for (const key of contentAttributes) {
       const { value } = resolveAttribute(obj, index, key);
       if (!value) continue;
-      const html =
-        value.kind === "XHTML"
-          ? value.value
-            ? renderXhtmlContent(value.value, { attachments })
-            : ""
-          : renderAttributeValue(value, index, attachments, labels);
+      let html: string;
+      if (value.kind === "XHTML") {
+        const content = displayXhtml(value, options);
+        html = content ? renderXhtmlContent(content, { attachments }) : "";
+      } else {
+        html = renderAttributeValue(value, index, attachments, labels, options);
+      }
       if (html) parts.push(`<div class="reqif-content">${html}</div>`);
     }
     return parts.join("");
   }
 
-  const xhtmlValues = obj.values.filter(
-    (v): v is AttributeValue & { kind: "XHTML"; value: XhtmlContent } =>
-      v.kind === "XHTML" && !!v.value && !lifecycle.consumedDefinitionIds.has(v.definitionRef),
-  );
-  return xhtmlValues
-    .map((v) => `<div class="reqif-content">${renderXhtmlContent(v.value, { attachments })}</div>`)
-    .join("");
+  const parts: string[] = [];
+  for (const v of obj.values) {
+    if (v.kind !== "XHTML") continue;
+    if (lifecycle.consumedDefinitionIds.has(v.definitionRef)) continue;
+    const content = displayXhtml(v, options);
+    if (!content) continue;
+    parts.push(`<div class="reqif-content">${renderXhtmlContent(content, { attachments })}</div>`);
+  }
+  return parts.join("");
 }
 
 /** Renders a single, unambiguous "Créé par X · date — Modifié par Y · date" line. */
@@ -683,7 +709,7 @@ function renderAttributeRow(
   options: RenderOptions,
 ): string | undefined {
   const name = def?.longName ?? value?.definitionRef ?? "?";
-  const html = value ? renderAttributeValue(value, index, attachments, labels) : "";
+  const html = value ? renderAttributeValue(value, index, attachments, labels, options) : "";
   if (!html && options.hideEmptyAttributes !== false) return undefined;
   return (
     `<div class="reqif-attr">` +
@@ -698,6 +724,7 @@ function renderAttributeValue(
   index: ReqIfIndex,
   attachments: AttachmentLookup,
   labels: RenderLabels,
+  options: RenderOptions,
 ): string {
   switch (value.kind) {
     case "BOOLEAN":
@@ -711,8 +738,10 @@ function renderAttributeValue(
       return value.value ? escapeHtml(value.value) : "";
     case "ENUMERATION":
       return index.enumLabels(value.valueRefs).map(escapeHtml).join(", ");
-    case "XHTML":
-      return value.value ? renderXhtmlContent(value.value, { attachments }) : "";
+    case "XHTML": {
+      const content = displayXhtml(value, options);
+      return content ? renderXhtmlContent(content, { attachments }) : "";
+    }
     default:
       return "";
   }
@@ -749,7 +778,13 @@ async function buildAttachmentLookup(
 function collectAllXhtmlContents(doc: ReqIfDocument): XhtmlContent[] {
   const out: XhtmlContent[] = [];
   const collectFromValues = (values: AttributeValue[]) => {
-    for (const v of values) if (v.kind === "XHTML" && v.value) out.push(v.value);
+    for (const v of values) {
+      if (v.kind !== "XHTML") continue;
+      // Both contents, whichever ends up displayed: an image referenced only
+      // by the original would otherwise never be resolved to a data: URI.
+      if (v.value) out.push(v.value);
+      if (v.originalValue) out.push(v.originalValue);
+    }
   };
   for (const o of doc.coreContent.specObjects) collectFromValues(o.values);
   for (const s of doc.coreContent.specifications) collectFromValues(s.values);
