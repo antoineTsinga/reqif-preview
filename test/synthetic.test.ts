@@ -531,9 +531,11 @@ describe("layout: tabs (multiple documents / specifications)", () => {
     expect(html).toContain('class="reqif-tabs"');
     expect(html).toContain(">Document A<");
     expect(html).toContain(">Document B<");
-    // exactly one radio input has the `checked` attribute by default (the first tab)
-    const inputTags = html.match(/<input[^>]*>/g) ?? [];
-    expect(inputTags.filter((tag) => tag.includes("checked"))).toHaveLength(1);
+    // Tabs are links, not hidden radios: that is what lets a deep anchor into
+    // another tab open it. No <input> should be emitted at all any more.
+    expect(html).not.toContain("<input");
+    expect(html).toMatch(/<a class="reqif-tab-label" href="#reqif-doc-[^"]+">/);
+    expect(html).toMatch(/<div class="reqif-tab-panel" id="reqif-doc-[^"]+">/);
   });
 
   it("renders a tab switcher across multiple Specifications within one document", async () => {
@@ -1226,5 +1228,56 @@ describe("onDegradation: making the silent fallbacks observable", () => {
     });
     // A diagnostic channel that can break what it observes is worse than none.
     expect(withHostileHandler).toBe(withoutHandler);
+  });
+});
+
+describe("URL-linked tabs (:target) and deep anchors", () => {
+  const twoDocs = () => {
+    const a = SYNTHETIC_REQIF.replace("<TITLE>Synthetic Sample</TITLE>", "<TITLE>Doc A</TITLE>")
+      .replace('IDENTIFIER="hdr-1"', 'IDENTIFIER="hdr-a"');
+    const b = SYNTHETIC_REQIF.replace("<TITLE>Synthetic Sample</TITLE>", "<TITLE>Doc B</TITLE>")
+      .replace('IDENTIFIER="hdr-1"', 'IDENTIFIER="hdr-b"');
+    return zipSync({ "a.reqif": strToU8(a), "b.reqif": strToU8(b) });
+  };
+
+  it("derives panel ids from ReqIF identifiers, not from tab position", async () => {
+    const pkg = await loadReqIfPackage(twoDocs());
+    const html = await renderPackageToHtml(pkg, { includeCss: false, layout: "tabs" });
+    expect(html).toContain('id="reqif-doc-hdr-a"');
+    expect(html).toContain('id="reqif-doc-hdr-b"');
+    expect(html).toContain('href="#reqif-doc-hdr-a"');
+  });
+
+  it("emits identical ids across two renders, so a shared link keeps working", async () => {
+    const pkg = await loadReqIfPackage(twoDocs());
+    const first = await renderPackageToHtml(pkg, { includeCss: false, layout: "tabs" });
+    const second = await renderPackageToHtml(pkg, { includeCss: false, layout: "tabs" });
+    const ids = (h: string) => (h.match(/id="reqif-(?:doc|spec)-[^"]+"/g) ?? []).join(",");
+    expect(ids(first)).toBe(ids(second));
+    expect(ids(first)).not.toBe(""); // guard against the regex silently matching nothing
+  });
+
+  it("ships the three rules that make a deep anchor open its panel", async () => {
+    const pkg = await loadReqIfPackage(twoDocs());
+    const html = await renderPackageToHtml(pkg, { layout: "tabs" }); // includeCss defaults to true
+    expect(html).toContain(".reqif-tab-panel:has(:target)");
+    expect(html).toContain(".reqif-tab-panel:target");
+    expect(html).toContain(".reqif-tabs:not(:has(:target)) > .reqif-tab-panel:first-of-type");
+  });
+
+  it("uses specification identifiers for the inner tab level", async () => {
+    const doc = parseReqIfXml(SYNTHETIC_REQIF);
+    doc.coreContent.specifications.push({
+      ...doc.coreContent.specifications[0],
+      identifier: "spec-2",
+      longName: "Second Spec",
+    });
+    const html = await renderDocumentToHtml(
+      doc,
+      { resolve: () => undefined, list: () => [] },
+      { includeCss: false, layout: "tabs" },
+    );
+    expect(html).toContain('id="reqif-spec-spec-2"');
+    expect(html).toContain('href="#reqif-spec-spec-2"');
   });
 });

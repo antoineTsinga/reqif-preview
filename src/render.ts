@@ -230,6 +230,9 @@ export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOpti
   let body: string;
   if (options.layout === "tabs" && pkg.documents.length > 1) {
     const items = pkg.documents.map((doc, i) => ({
+      // From the header identifier, not the position: the id lands in the URL,
+      // so a shared link must survive a document being added ahead of this one.
+      id: htmlId("reqif-doc", doc.header.identifier || String(i + 1)),
       label: doc.header.title || `${options.labels?.headerTitle ?? DEFAULT_LABELS.headerTitle} ${i + 1}`,
       html: parts[i],
     }));
@@ -271,6 +274,7 @@ export async function renderDocumentToHtml(
   let specsHtml: string;
   if (options.layout === "tabs" && specHtmls.length > 1) {
     const items = doc.coreContent.specifications.map((spec, i) => ({
+      id: htmlId("reqif-spec", spec.identifier),
       label: spec.longName || labels.untitled,
       html: specHtmls[i],
     }));
@@ -358,9 +362,19 @@ function displayXhtml(value: AttributeValueXhtml, options: RenderOptions): Xhtml
   return value.originalValue ?? value.value;
 }
 
-/** Stable, sanitized anchor id for a SpecObject, used by relation links. */
+/**
+ * Turns a ReqIF identifier into a DOM id: stable across renders (it carries no
+ * positional information), unique within a package, and safe both as an HTML
+ * id and inside a CSS id selector — the prefix guarantees the leading
+ * character is a letter, which `#123` would not be.
+ */
+function htmlId(prefix: string, identifier: string): string {
+  return `${prefix}-${identifier.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+/** Anchor id for a SpecObject, used by relation links. */
 function domId(identifier: string): string {
-  return "reqif-obj-" + identifier.replace(/[^A-Za-z0-9_-]/g, "_");
+  return htmlId("reqif-obj", identifier);
 }
 
 /** Does this object qualify as a "chapter" for numbering purposes? */
@@ -939,12 +953,20 @@ const DEFAULT_CSS = `
 .reqif-relation-target:hover { text-decoration: underline; }
 .reqif-relation-unresolved { color: #aaa; font-style: italic; text-decoration: none; }
 
-/* Tabs (CSS-only, see tabs.ts) */
-.reqif-tab-input { position: absolute; opacity: 0; pointer-events: none; }
+/* Tabs (CSS-only, see tabs.ts). The tabs are links and the URL fragment picks
+   the panel, which is what makes a deep anchor into a hidden tab work: the
+   panel *containing* the target opens, at every nesting level at once.
+   NOTE: the ":first-of-type" default below means "first div child of
+   .reqif-tabs". tabs.ts emits <nav> then the panels, so that is the first
+   panel — inserting any other <div> before them would silently break it. */
 .reqif-tab-headers { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #e2e2e2; margin-bottom: 16px; }
-.reqif-tab-label { cursor: pointer; padding: 8px 14px; font-size: 14px; font-weight: 600; color: #666; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
+.reqif-tab-label { cursor: pointer; padding: 8px 14px; font-size: 14px; font-weight: 600; color: #666; text-decoration: none; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
 .reqif-tab-label:hover { color: #0b62d6; }
-.reqif-tab-panel { display: none; }
+.reqif-tab-label:focus-visible { outline: 2px solid #0b62d6; outline-offset: -2px; }
+.reqif-tab-panel { display: none; scroll-margin-top: 8px; }
+.reqif-tab-panel:target,
+.reqif-tab-panel:has(:target) { display: block; }
+.reqif-tabs:not(:has(:target)) > .reqif-tab-panel:first-of-type { display: block; }
 
 /* Reading mode: strip the "card list" look for something closer to a flowing Word document */
 .reqif-reading-mode .reqif-node { border: none; border-radius: 0; padding: 0; margin: 0 0 18px; background: transparent; }
