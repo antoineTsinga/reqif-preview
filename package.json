@@ -14,7 +14,9 @@
     },
     "./style.css": "./dist/style.css"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup && tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist",
@@ -23,16 +25,23 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["reqif", "reqifz", "requirements", "parser", "preview", "omg"],
+  "keywords": [
+    "reqif",
+    "reqifz",
+    "requirements",
+    "parser",
+    "preview",
+    "omg"
+  ],
   "license": "MIT",
   "dependencies": {
     "fast-xml-parser": "5.9.3",
     "fflate": "0.8.3"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.20.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.9"
   }
 }

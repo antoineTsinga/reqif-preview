@@ -1,3 +1,13 @@
 node_modules/
 dist/
 *.log
+
+# Local scratch scripts and their output — not part of the library.
+src/try.ts
+try.mjs
+preview.html
+
+# Large local test datasets. sample.reqif and test/sample1.reqif are the
+# fixtures the test suite actually uses; anything bigger stays out of history.
+AEB_Platform_Requirements_TestDataset.reqif
+*.reqifz.local
