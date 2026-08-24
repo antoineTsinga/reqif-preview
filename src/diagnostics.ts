@@ -23,6 +23,8 @@ export type DegradationCode =
   | "orphan-attribute-value"
   /** A SpecHierarchy node pointed at a SpecObject that does not exist. */
   | "missing-spec-object"
+  /** The same SpecObject appears more than once in the tree; only the first occurrence carries the anchor id. */
+  | "duplicate-dom-id"
   /** A customAttributeRenderers callback threw and was skipped. */
   | "custom-renderer-threw"
   /** A customAttributeRenderers callback returned unbalanced HTML; it was escaped. */

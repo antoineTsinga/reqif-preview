@@ -223,8 +223,13 @@ export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOpti
   // One index spanning every document in the package, so that a relation
   // pointing across .reqif boundaries resolves (see the ReqIfIndex ctor).
   const index = new ReqIfIndex(pkg.documents);
+  // One set for the whole package: a SpecObject can legally appear at several
+  // places in the tree, and duplicate ids would make its anchor ambiguous.
+  const emittedIds = new Set<string>();
   const parts = await Promise.all(
-    pkg.documents.map((doc) => renderDocumentToHtml(doc, attachments, { ...options, includeCss: false }, index)),
+    pkg.documents.map((doc) =>
+      renderDocumentToHtml(doc, attachments, { ...options, includeCss: false }, index, emittedIds),
+    ),
   );
 
   let body: string;
@@ -258,6 +263,7 @@ export async function renderDocumentToHtml(
   attachments: AttachmentResolver,
   options: RenderOptions = {},
   sharedIndex?: ReqIfIndex,
+  emittedIds: Set<string> = new Set(),
 ): Promise<string> {
   const labels: RenderLabels = { ...DEFAULT_LABELS, ...options.labels };
   const index = sharedIndex ?? new ReqIfIndex(doc);
@@ -269,7 +275,7 @@ export async function renderDocumentToHtml(
   );
 
   const header = options.readingMode ? "" : renderHeader(doc, labels);
-  const specHtmls = doc.coreContent.specifications.map((spec) => renderSpecification(spec, index, lookup, labels, options));
+  const specHtmls = doc.coreContent.specifications.map((spec) => renderSpecification(spec, index, lookup, labels, options, emittedIds));
 
   let specsHtml: string;
   if (options.layout === "tabs" && specHtmls.length > 1) {
@@ -295,9 +301,10 @@ export function renderSpecification(
   attachments: AttachmentLookup,
   labels: RenderLabels = DEFAULT_LABELS,
   options: RenderOptions = {},
+  emittedIds: Set<string> = new Set(),
 ): string {
   const title = escapeHtml(spec.longName || labels.untitled);
-  const nodes = renderHierarchyChildren(spec.children, index, attachments, labels, options, [], 1);
+  const nodes = renderHierarchyChildren(spec.children, index, attachments, labels, options, [], 1, emittedIds);
   return `<section class="reqif-spec"><h2 class="reqif-spec-title">${title}</h2><div class="reqif-tree">${nodes}</div></section>`;
 }
 
@@ -416,6 +423,7 @@ function renderHierarchyChildren(
   options: RenderOptions,
   basePath: number[],
   depth: number,
+  emittedIds: Set<string>,
 ): string {
   const chapterAttrs = options.chapterNumberAttributes;
   let counter = 0;
@@ -430,7 +438,7 @@ function renderHierarchyChildren(
         displayPath = [...basePath, counter];
         childBasePath = displayPath;
       }
-      return renderHierarchyNode(node, index, attachments, labels, options, displayPath, childBasePath, depth);
+      return renderHierarchyNode(node, index, attachments, labels, options, displayPath, childBasePath, depth, emittedIds);
     })
     .join("");
 }
@@ -444,6 +452,7 @@ function renderHierarchyNode(
   displayPath: number[] | undefined,
   childBasePath: number[],
   depth: number,
+  emittedIds: Set<string>,
 ): string {
   const obj = index.specObjects.get(node.objectRef);
   const specType = obj ? index.specTypes.get(obj.typeRef) : undefined;
@@ -472,8 +481,35 @@ function renderHierarchyNode(
     ? `<h${headingLevelFor(depth)} class="reqif-node-heading">${escapeHtml(titleText)}</h${headingLevelFor(depth)}>`
     : escapeHtml(titleText);
 
-  const childrenHtml = renderHierarchyChildren(node.children, index, attachments, labels, options, childBasePath, depth + 1);
-  const idAttr = obj ? ` id="${escapeAttr(domId(obj.identifier))}"` : "";
+  const childrenHtml = renderHierarchyChildren(
+    node.children,
+    index,
+    attachments,
+    labels,
+    options,
+    childBasePath,
+    depth + 1,
+    emittedIds,
+  );
+  // Only the first occurrence carries the anchor id. A SpecObject may legally
+  // sit at several places in the tree, and duplicate ids are invalid HTML — the
+  // browser resolves a fragment to the first match anyway, so emitting the rest
+  // would only make :target ambiguous without making them reachable.
+  let idAttr = "";
+  if (obj) {
+    const id = domId(obj.identifier);
+    if (emittedIds.has(id)) {
+      reportDegradation(
+        options.onDegradation,
+        "duplicate-dom-id",
+        `SpecObject "${obj.identifier}" is rendered more than once; only the first occurrence carries the anchor id.`,
+        { specObject: obj.identifier, id, specHierarchy: node.identifier },
+      );
+    } else {
+      emittedIds.add(id);
+      idAttr = ` id="${escapeAttr(id)}"`;
+    }
+  }
 
   return (
     `<details class="reqif-node" open${idAttr}>` +

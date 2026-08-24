@@ -1281,3 +1281,59 @@ describe("URL-linked tabs (:target) and deep anchors", () => {
     expect(html).toContain('href="#reqif-spec-spec-2"');
   });
 });
+
+describe("duplicate anchor ids: first occurrence wins", () => {
+  /** One SpecObject referenced by two SPEC-HIERARCHY nodes — legal per the spec. */
+  const TWICE = `<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES/><SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES/></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="shared" LONG-NAME="Reused requirement">
+      <VALUES/><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE>
+    </SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS><SPECIFICATION IDENTIFIER="s1" LONG-NAME="Spec"><CHILDREN>
+      <SPEC-HIERARCHY IDENTIFIER="sh-1"><OBJECT><SPEC-OBJECT-REF>shared</SPEC-OBJECT-REF></OBJECT></SPEC-HIERARCHY>
+      <SPEC-HIERARCHY IDENTIFIER="sh-2"><OBJECT><SPEC-OBJECT-REF>shared</SPEC-OBJECT-REF></OBJECT></SPEC-HIERARCHY>
+    </CHILDREN></SPECIFICATION></SPECIFICATIONS>
+    <SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+
+  it("emits the id once even though the object is rendered twice", async () => {
+    const pkg = await loadReqIfPackage(TWICE);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html.match(/Reused requirement/g)).toHaveLength(2); // rendered twice…
+    expect(html.match(/id="reqif-obj-shared"/g)).toHaveLength(1); // …addressed once
+  });
+
+  it("reports each duplicate through onDegradation", async () => {
+    const pkg = await loadReqIfPackage(TWICE);
+    const events: DegradationEvent[] = [];
+    await renderPackageToHtml(pkg, { includeCss: false, onDegradation: (e) => events.push(e) });
+    const dupes = events.filter((e) => e.code === "duplicate-dom-id");
+    expect(dupes).toHaveLength(1);
+    expect(dupes[0].detail?.specObject).toBe("shared");
+    expect(dupes[0].detail?.specHierarchy).toBe("sh-2"); // the second node, not the first
+  });
+
+  it("shares the set across documents of one package, so a duplicate across .reqif files is caught", async () => {
+    const zipBytes = zipSync({ "a.reqif": strToU8(TWICE), "b.reqif": strToU8(TWICE) });
+    const pkg = await loadReqIfPackage(zipBytes);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html.match(/id="reqif-obj-shared"/g)).toHaveLength(1);
+  });
+
+  it("lets a caller driving renderSpecification share one set across calls", async () => {
+    const doc = parseReqIfXml(TWICE);
+    const index = new ReqIfIndex(doc);
+    const lookup = { get: () => undefined };
+    const shared = new Set<string>();
+    const spec = doc.coreContent.specifications[0];
+
+    const once = renderSpecification(spec, index, lookup, undefined, {}, shared);
+    const twice = renderSpecification(spec, index, lookup, undefined, {}, shared);
+    expect(once.match(/id="reqif-obj-shared"/g)).toHaveLength(1);
+    expect(twice.match(/id="reqif-obj-shared"/g)).toBeNull(); // already claimed
+  });
+});
