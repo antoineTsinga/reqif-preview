@@ -1012,3 +1012,70 @@ describe("AttributeValueXHTML: theOriginalValue (10.8.20)", () => {
     expect(valueToPlainText(value!, index)).toBe("Rich original text");
   });
 });
+
+describe("cross-document SpecRelation (GLOBAL-REF, clause 11 rule 5b)", () => {
+  /** A minimal document exposing one object, and optionally a relation to `linkTo`. */
+  function docWith(id: string, objId: string, title: string, linkTo?: string): string {
+    const relation = linkTo
+      ? `<SPEC-RELATION IDENTIFIER="rel-${id}">
+           <TYPE><SPEC-RELATION-TYPE-REF>srt-1</SPEC-RELATION-TYPE-REF></TYPE>
+           <SOURCE><SPEC-OBJECT-REF>${objId}</SPEC-OBJECT-REF></SOURCE>
+           <TARGET><SPEC-OBJECT-REF>${linkTo}</SPEC-OBJECT-REF></TARGET>
+         </SPEC-RELATION>`
+      : "";
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h-${id}"><TITLE>Doc ${id}</TITLE><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-STRING IDENTIFIER="dt-s" LONG-NAME="S"/></DATATYPES>
+    <SPEC-TYPES>
+      <SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES/></SPEC-OBJECT-TYPE>
+      <SPEC-RELATION-TYPE IDENTIFIER="srt-1" LONG-NAME="Derives from"><SPEC-ATTRIBUTES/></SPEC-RELATION-TYPE>
+    </SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="${objId}" LONG-NAME="${title}">
+      <VALUES/><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE>
+    </SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS><SPECIFICATION IDENTIFIER="s-${id}" LONG-NAME="Spec ${id}"><CHILDREN>
+      <SPEC-HIERARCHY IDENTIFIER="sh-${id}"><OBJECT><SPEC-OBJECT-REF>${objId}</SPEC-OBJECT-REF></OBJECT></SPEC-HIERARCHY>
+    </CHILDREN></SPECIFICATION></SPECIFICATIONS>
+    <SPEC-RELATIONS>${relation}</SPEC-RELATIONS><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+  }
+
+  const twoDocPackage = () =>
+    zipSync({
+      "a.reqif": strToU8(docWith("a", "obj-a", "Customer requirement", "obj-b")),
+      "b.reqif": strToU8(docWith("b", "obj-b", "System requirement")),
+    });
+
+  it("indexes several documents at once", async () => {
+    const pkg = await loadReqIfPackage(twoDocPackage());
+    const index = new ReqIfIndex(pkg.documents);
+    expect(index.specObjects.get("obj-a")?.longName).toBe("Customer requirement");
+    expect(index.specObjects.get("obj-b")?.longName).toBe("System requirement");
+  });
+
+  it("resolves a relation pointing into another .reqif of the same package", async () => {
+    const pkg = await loadReqIfPackage(twoDocPackage());
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    // The target lives in b.reqif; before the shared index this fell back to
+    // the unresolved label instead of an anchor.
+    expect(html).toContain('href="#reqif-obj-obj-b"');
+    expect(html).toContain("System requirement");
+    expect(html).not.toContain("(objet non trouvé)");
+  });
+
+  it("still falls back to a plain label when the target is nowhere in the package", async () => {
+    const zipBytes = zipSync({ "a.reqif": strToU8(docWith("a", "obj-a", "Orphan source", "obj-missing")) });
+    const pkg = await loadReqIfPackage(zipBytes);
+    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    expect(html).toContain("(objet non trouvé)");
+  });
+
+  it("keeps indexing a single document when called the old way", () => {
+    const doc = parseReqIfXml(docWith("a", "obj-a", "Alone"));
+    const index = new ReqIfIndex(doc);
+    expect(index.specObjects.get("obj-a")?.longName).toBe("Alone");
+  });
+});

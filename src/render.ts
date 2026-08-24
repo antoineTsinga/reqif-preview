@@ -210,8 +210,11 @@ const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
 /** Renders every document found in a package (a .reqifz may contain several). */
 export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOptions = {}): Promise<string> {
   const attachments = options.attachments ?? pkg.attachments;
+  // One index spanning every document in the package, so that a relation
+  // pointing across .reqif boundaries resolves (see the ReqIfIndex ctor).
+  const index = new ReqIfIndex(pkg.documents);
   const parts = await Promise.all(
-    pkg.documents.map((doc) => renderDocumentToHtml(doc, attachments, { ...options, includeCss: false })),
+    pkg.documents.map((doc) => renderDocumentToHtml(doc, attachments, { ...options, includeCss: false }, index)),
   );
 
   let body: string;
@@ -230,14 +233,21 @@ export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOpti
   return `${css}<div class="${rootClass}">${body}</div>`;
 }
 
-/** Renders a single ReqIfDocument (header + all its specifications) to HTML. */
+/**
+ * Renders a single ReqIfDocument (header + all its specifications) to HTML.
+ *
+ * `sharedIndex` lets a caller supply an index built over several documents —
+ * that is how `renderPackageToHtml` makes cross-document relations resolve.
+ * Omit it and the document is indexed on its own, as before.
+ */
 export async function renderDocumentToHtml(
   doc: ReqIfDocument,
   attachments: AttachmentResolver,
   options: RenderOptions = {},
+  sharedIndex?: ReqIfIndex,
 ): Promise<string> {
   const labels: RenderLabels = { ...DEFAULT_LABELS, ...options.labels };
-  const index = new ReqIfIndex(doc);
+  const index = sharedIndex ?? new ReqIfIndex(doc);
   const lookup = await buildAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
 
   const header = options.readingMode ? "" : renderHeader(doc, labels);

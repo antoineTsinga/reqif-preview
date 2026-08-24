@@ -34,7 +34,18 @@ export class ReqIfIndex {
   /** SpecRelations where a given SpecObject is the TARGET, keyed by that object's id. */
   readonly incomingRelations = new Map<Identifier, SpecRelation[]>();
 
-  constructor(doc: ReqIfDocument) {
+  /**
+   * Indexes one document, or several at once. Several matters for a .reqifz:
+   * a SpecRelation's source/target are GLOBAL-REF in the schema (clause 11,
+   * rule 5b), so a relation may legally point at a SpecObject living in
+   * another .reqif of the same package. A per-document index cannot resolve
+   * those.
+   */
+  constructor(input: ReqIfDocument | ReqIfDocument[]) {
+    for (const doc of Array.isArray(input) ? input : [input]) this.addDocument(doc);
+  }
+
+  private addDocument(doc: ReqIfDocument): void {
     const c = doc.coreContent;
     for (const d of c.datatypes) this.datatypes.set(d.identifier, d);
     for (const t of c.specTypes) {

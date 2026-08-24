@@ -309,11 +309,20 @@ Les liens typés entre exigences (`SpecRelation` — ex. "dérive de", "satisfai
 </div>
 ```
 
-Si l'objet lié n'est pas trouvé (relation vers un objet absent du document, ou rendu dans un autre onglet), le libellé s'affiche quand même, sans lien cliquable. C'est visible par défaut, y compris en `readingMode` (un lien de traçabilité est du contenu à part entière, pas de la métadonnée technique) :
+Si l'objet lié n'est pas trouvé, le libellé s'affiche quand même, sans lien cliquable. C'est visible par défaut, y compris en `readingMode` (un lien de traçabilité est du contenu à part entière, pas de la métadonnée technique) :
 
 ```ts
 const html = await renderPackageToHtml(pkg, { showRelations: false }); // pour le masquer
 ```
+
+**Relations entre documents d'un même `.reqifz`** — elles se résolvent. La spec type `SOURCE`/`TARGET` d'une `SpecRelation` en `GLOBAL-REF` (clause 11, règle 5b), c'est-à-dire qu'une relation peut légalement viser un objet d'un *autre* `.reqif` du paquet. `renderPackageToHtml` construit donc un index unique couvrant tous les documents. Si vous appelez `renderDocumentToHtml` document par document, chacun n'est indexé que sur lui-même — passez votre propre index partagé en 4ᵉ argument pour retrouver le même comportement :
+
+```ts
+const index = new ReqIfIndex(pkg.documents); // et non pkg.document
+const html = await renderDocumentToHtml(doc, pkg.attachments, options, index);
+```
+
+⚠️ **En `layout: "tabs"`, une ancre vers un objet d'un autre onglet ne révèle pas cet onglet.** Les onglets sont en CSS pur (`display:none` tant que la radio n'est pas cochée) : le navigateur défile vers une cible masquée, sans effet visible. Le lien reste correct, seule la navigation est inopérante — il n'y a pas de correctif sans JavaScript. En `layout: "stacked"` (le défaut), tout fonctionne.
 
 **Limite actuelle** : seules les `SpecRelation` (liens objet-à-objet) sont affichées. Les `RelationGroup` (regroupements de relations entre deux `Specification`) sont parsées (`doc.coreContent.specRelationGroups`) mais pas encore rendues — exploitables directement via le modèle de données si besoin.
 
