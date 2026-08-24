@@ -877,3 +877,51 @@ describe(".reqifz packaging with real attachments", () => {
     expect(html).toContain("demo.mp3");
   });
 });
+
+describe("AlternativeID (10.8.2)", () => {
+  function docWithAltIds(objectAlt: string, typeAlt = ""): string {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-STRING IDENTIFIER="dt-s" LONG-NAME="S"/></DATATYPES>
+    <SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T">${typeAlt}<SPEC-ATTRIBUTES>
+      <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="a1" LONG-NAME="Name"><TYPE><DATATYPE-DEFINITION-STRING-REF>dt-s</DATATYPE-DEFINITION-STRING-REF></TYPE></ATTRIBUTE-DEFINITION-STRING>
+    </SPEC-ATTRIBUTES></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1" LONG-NAME="Req">${objectAlt}<VALUES>
+      <ATTRIBUTE-VALUE-STRING THE-VALUE="hello"><DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>a1</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION></ATTRIBUTE-VALUE-STRING>
+    </VALUES><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE></SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS/><SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+  }
+
+  it("reads the spec-conforming doubled wrapper into alternativeId", () => {
+    const doc = parseReqIfXml(
+      docWithAltIds(`<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="DOORS-4711"/></ALTERNATIVE-ID>`),
+    );
+    expect(doc.coreContent.specObjects[0].alternativeId).toEqual({ identifier: "DOORS-4711" });
+    // the primary identifier must be untouched by it
+    expect(doc.coreContent.specObjects[0].identifier).toBe("o1");
+  });
+
+  it("also accepts the flat form some exporters emit", () => {
+    const doc = parseReqIfXml(docWithAltIds(`<ALTERNATIVE-ID IDENTIFIER="FLAT-99"/>`));
+    expect(doc.coreContent.specObjects[0].alternativeId).toEqual({ identifier: "FLAT-99" });
+  });
+
+  it("applies to every Identifiable, not just SpecObject", () => {
+    const doc = parseReqIfXml(
+      docWithAltIds("", `<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="TYPE-ALT"/></ALTERNATIVE-ID>`),
+    );
+    expect(doc.coreContent.specTypes[0].alternativeId).toEqual({ identifier: "TYPE-ALT" });
+  });
+
+  it("is undefined when absent, and when the wrapper carries no usable IDENTIFIER", () => {
+    expect(parseReqIfXml(docWithAltIds("")).coreContent.specObjects[0].alternativeId).toBeUndefined();
+    expect(
+      parseReqIfXml(docWithAltIds(`<ALTERNATIVE-ID><ALTERNATIVE-ID/></ALTERNATIVE-ID>`)).coreContent
+        .specObjects[0].alternativeId,
+    ).toBeUndefined();
+  });
+});

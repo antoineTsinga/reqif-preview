@@ -17,6 +17,7 @@ import {
 import { xNodesToXhtmlContent } from "./xhtml.js";
 import { ReqIfParseError } from "./errors.js";
 import type {
+  AlternativeId,
   AttributeDefinition,
   AttributeValue,
   DatatypeDefinition,
@@ -152,6 +153,26 @@ function extractNamespaces(xml: string): Record<string, string> {
   return out;
 }
 
+/**
+ * 10.8.2 AlternativeID. Like every other aggregation in the format it is
+ * wrapped in an element named after the role — which here happens to repeat
+ * the type name, so the shape is doubled:
+ *
+ *   <ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="external-42"/></ALTERNATIVE-ID>
+ *
+ * The flat form (IDENTIFIER carried directly by the wrapper) is accepted too:
+ * it costs one `??` and some exporters emit it. A wrapper without any usable
+ * IDENTIFIER yields `undefined` rather than an empty object, so callers can
+ * test the field itself instead of its contents.
+ */
+function parseAlternativeId(node: XNode): AlternativeId | undefined {
+  const wrapper = findFirst(node, "ALTERNATIVE-ID");
+  if (!wrapper) return undefined;
+  const inner = elementsOf(wrapper)[0];
+  const identifier = (inner ? attrsOf(inner)["IDENTIFIER"] : undefined) ?? attrsOf(wrapper)["IDENTIFIER"];
+  return identifier ? { identifier } : undefined;
+}
+
 function parseIdentifiable(node: XNode): Identifiable {
   const a = attrsOf(node);
   return {
@@ -159,6 +180,7 @@ function parseIdentifiable(node: XNode): Identifiable {
     lastChange: a["LAST-CHANGE"],
     longName: a["LONG-NAME"],
     desc: a["DESC"],
+    alternativeId: parseAlternativeId(node),
   };
 }
 

@@ -11,13 +11,35 @@
 
 export type Identifier = string;
 
+/**
+ * 10.8.2 AlternativeID — an optional secondary identifier an exporting tool
+ * may attach to any identifiable element, typically to carry the id the
+ * element had in the originating repository.
+ *
+ * The spec gives the class one *attribute*, `identifier`, and one
+ * *association*, `ident : Identifiable` — the back-linkage to the owning
+ * element (Figure 10.2 names the two ends `+ident` / `+alternativeID`).
+ * That back-linkage is deliberately NOT modeled here: it is pure navigation,
+ * derivable from containment, never serialized in the XML, and materializing
+ * it would make ReqIfDocument cyclic — breaking JSON.stringify and the
+ * acyclic-model invariant the whole design rests on.
+ *
+ * Note that clause 2 (Conformance) allows a tool to use AlternativeID as a
+ * *parallel identification mechanism*. ReqIfIndex keys off the primary
+ * `identifier` only, so a document whose *-REFs point at alternative ids
+ * would not resolve. No such export has been observed so far.
+ */
+export interface AlternativeId {
+  identifier: Identifier;
+}
+
 /** Common base for every identifiable ReqIF element (10.8.32 Identifiable). */
 export interface Identifiable {
   identifier: Identifier;
   lastChange?: string; // xsd:dateTime
   longName?: string;
   desc?: string;
-  alternativeId?: { identifier: Identifier; ident: string };
+  alternativeId?: AlternativeId;
 }
 
 /** 10.8.1 AccessControlledElement */
