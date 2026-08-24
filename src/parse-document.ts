@@ -414,11 +414,15 @@ function parseSpecHierarchy(node: XNode): SpecHierarchy {
   const objectRef = readRef(node, "OBJECT") ?? "";
   const childrenWrap = findFirst(node, "CHILDREN");
   const children = childrenWrap ? findAll(childrenWrap, "SPEC-HIERARCHY").map(parseSpecHierarchy) : [];
+  // Absent and present-but-empty mean different things here (10.8.37 [5]),
+  // so don't collapse them: readRefs alone would return [] for both.
+  const hasEditableAtts = !!findFirst(node, "EDITABLE-ATTS");
   return {
     ...base,
     isEditable: parseBool(a["IS-EDITABLE"]),
     isTableInternal: parseBool(a["IS-TABLE-INTERNAL"]),
     objectRef,
+    editableAttributeRefs: hasEditableAtts ? readRefs(node, "EDITABLE-ATTS") : undefined,
     children,
   };
 }

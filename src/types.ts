@@ -288,6 +288,15 @@ export interface SpecHierarchy extends Identifiable, AccessControlled {
   isTableInternal?: boolean;
   /** Identifier of the SpecObject represented by this node. */
   objectRef: Identifier;
+  /**
+   * Identifiers of the AttributeDefinitions a tool user may edit on this node
+   * (EDITABLE-ATTS). `undefined` means the element was absent, which per
+   * constraint [5] of 10.8.37 makes the node inherit its parent's set — an
+   * empty array means the element was present but empty. The distinction is
+   * preserved here; this library does not implement the inheritance, having
+   * no use for editability.
+   */
+  editableAttributeRefs?: Identifier[];
   children: SpecHierarchy[];
 }
 

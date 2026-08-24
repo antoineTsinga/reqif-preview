@@ -15,6 +15,7 @@ export {
   renderPackageToHtml,
   renderDocumentToHtml,
   renderSpecification,
+  createAttachmentLookup,
   xhtmlToPlainText,
   escapeHtml,
   type RenderOptions,

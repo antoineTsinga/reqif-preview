@@ -345,6 +345,7 @@ Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'u
 | `renderPackageToHtml(pkg, options?)` | Rendu HTML complet (tous les documents du package). |
 | `renderDocumentToHtml(doc, attachments, options?)` | Rendu HTML d'un seul document. |
 | `renderSpecification(spec, index, attachments, labels?, options?)` | Rendu HTML d'une seule arborescence de spécification (sync, pour UI virtualisée). |
+| `createAttachmentLookup(doc, resolver, maxInlineBytes?)` | Pré-résout les pièces jointes en `data:` URI — nécessaire pour alimenter `renderSpecification`, qui est synchrone. |
 | `renderXhtmlContent(content, options?)` | Sérialisation assainie d'un fragment XHTML isolé. |
 | `xhtmlToPlainText(content)` | Extraction texte brut d'un fragment XHTML. |
 | `createAttachmentResolver(fn)` | Construit un résolveur de pièces jointes personnalisé. |

@@ -248,7 +248,7 @@ export async function renderDocumentToHtml(
 ): Promise<string> {
   const labels: RenderLabels = { ...DEFAULT_LABELS, ...options.labels };
   const index = sharedIndex ?? new ReqIfIndex(doc);
-  const lookup = await buildAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
+  const lookup = await createAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
 
   const header = options.readingMode ? "" : renderHeader(doc, labels);
   const specHtmls = doc.coreContent.specifications.map((spec) => renderSpecification(spec, index, lookup, labels, options));
@@ -762,10 +762,19 @@ function renderAttributeValue(
 // bytes up front, and hand back a synchronous lookup the renderer can use.
 // ---------------------------------------------------------------------------
 
-async function buildAttachmentLookup(
+/**
+ * Pre-resolves every attachment a document references into data: URIs, giving
+ * back the synchronous lookup the render functions need.
+ *
+ * Exported because `renderSpecification` is synchronous — that is the point of
+ * it, for virtualized UIs — and therefore cannot resolve attachments itself.
+ * Without this, a caller driving `renderSpecification` directly could not
+ * display a single image.
+ */
+export async function createAttachmentLookup(
   doc: ReqIfDocument,
   resolver: AttachmentResolver,
-  maxInlineBytes: number,
+  maxInlineBytes: number = DEFAULT_MAX_INLINE_BYTES,
 ): Promise<AttachmentLookup> {
   const paths = new Set<string>();
   for (const content of collectAllXhtmlContents(doc)) collectReferencedPaths(content, paths);

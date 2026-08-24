@@ -11,6 +11,7 @@ import {
   xhtmlToPlainText,
   resolveAttribute,
   valueToPlainText,
+  createAttachmentLookup,
 } from "../src/index.js";
 import { SYNTHETIC_REQIF, TINY_PNG_BASE64 } from "./fixtures.js";
 
@@ -1077,5 +1078,67 @@ describe("cross-document SpecRelation (GLOBAL-REF, clause 11 rule 5b)", () => {
     const doc = parseReqIfXml(docWith("a", "obj-a", "Alone"));
     const index = new ReqIfIndex(doc);
     expect(index.specObjects.get("obj-a")?.longName).toBe("Alone");
+  });
+});
+
+describe("model completeness: EDITABLE-ATTS, alternative ids, attachment lookup", () => {
+  function docWithHierarchy(editableAtts: string): string {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES><DATATYPE-DEFINITION-STRING IDENTIFIER="dt-s" LONG-NAME="S"/></DATATYPES>
+    <SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES>
+      <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="ad-1" LONG-NAME="Name"><TYPE><DATATYPE-DEFINITION-STRING-REF>dt-s</DATATYPE-DEFINITION-STRING-REF></TYPE></ATTRIBUTE-DEFINITION-STRING>
+    </SPEC-ATTRIBUTES></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1" LONG-NAME="Req">
+      <ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="DOORS-4711"/></ALTERNATIVE-ID>
+      <VALUES/><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE>
+    </SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS><SPECIFICATION IDENTIFIER="s1" LONG-NAME="Spec"><CHILDREN>
+      <SPEC-HIERARCHY IDENTIFIER="sh1">${editableAtts}
+        <OBJECT><SPEC-OBJECT-REF>o1</SPEC-OBJECT-REF></OBJECT>
+      </SPEC-HIERARCHY>
+    </CHILDREN></SPECIFICATION></SPECIFICATIONS>
+    <SPEC-RELATIONS/><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`;
+  }
+
+  it("parses EDITABLE-ATTS into attribute definition ids", () => {
+    const doc = parseReqIfXml(
+      docWithHierarchy(`<EDITABLE-ATTS><ATTRIBUTE-DEFINITION-STRING-REF>ad-1</ATTRIBUTE-DEFINITION-STRING-REF></EDITABLE-ATTS>`),
+    );
+    expect(doc.coreContent.specifications[0].children[0].editableAttributeRefs).toEqual(["ad-1"]);
+  });
+
+  it("keeps absent and present-but-empty EDITABLE-ATTS distinct (10.8.37 [5])", () => {
+    const absent = parseReqIfXml(docWithHierarchy(""));
+    expect(absent.coreContent.specifications[0].children[0].editableAttributeRefs).toBeUndefined();
+
+    const empty = parseReqIfXml(docWithHierarchy(`<EDITABLE-ATTS/>`));
+    expect(empty.coreContent.specifications[0].children[0].editableAttributeRefs).toEqual([]);
+  });
+
+  it("indexes elements by their AlternativeID without disturbing primary resolution", () => {
+    const doc = parseReqIfXml(docWithHierarchy(""));
+    const index = new ReqIfIndex(doc);
+    expect(index.byAlternativeId.get("DOORS-4711")?.identifier).toBe("o1");
+    // the primary namespace is untouched: an alternative id resolves nowhere there
+    expect(index.specObjects.get("DOORS-4711")).toBeUndefined();
+    expect(index.specObjects.get("o1")?.longName).toBe("Req");
+  });
+
+  it("lets a caller build an AttachmentLookup and drive renderSpecification directly", async () => {
+    const zipBytes = zipSync({
+      "model.reqif": strToU8(SYNTHETIC_REQIF),
+      "diagram.png": base64ToBytes(TINY_PNG_BASE64),
+    });
+    const pkg = await loadReqIfPackage(zipBytes);
+    const index = new ReqIfIndex(pkg.documents);
+    const lookup = await createAttachmentLookup(pkg.document, pkg.attachments);
+
+    const html = renderSpecification(pkg.document.coreContent.specifications[0], index, lookup);
+    expect(html).toMatch(/<img src="data:image\/png;base64,[A-Za-z0-9+/=]+"/);
   });
 });
