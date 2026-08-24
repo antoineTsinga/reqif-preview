@@ -143,6 +143,16 @@ Toute référence dans le document suit le même patron syntaxique :
 
 — un élément "wrapper" nommé d'après le rôle de l'association UML (`TYPE`, `DEFINITION`, `OBJECT`, `SOURCE`, `TARGET`...) contenant un unique élément `*-REF` dont le nom répète (redondamment) le type cible. `readRef(node, "TYPE")` ignore ce nom redondant et prend simplement "le premier enfant qui n'est pas un nœud texte", ce qui rend le code robuste même si la balise `*-REF` exacte varie. Le modèle de données qui en résulte **ne contient jamais d'objet imbriqué pour une référence — uniquement la chaîne d'identifiant** (`typeRef: Identifier`, jamais `type: SpecObjectType`). C'est un choix délibéré : ça garde `ReqIfDocument` acyclique et trivialement sérialisable en JSON (`JSON.stringify` fonctionne sans `replacer` custom), au prix de devoir passer par `ReqIfIndex` (section 5) pour résoudre une référence en objet réel.
 
+### Le cas particulier de `ALTERNATIVE-ID`
+
+`parseIdentifiable` lit les quatre attributs communs (`IDENTIFIER`, `LAST-CHANGE`, `LONG-NAME`, `DESC`) plus l'agrégation optionnelle `ALTERNATIVE-ID` (clause 10.8.2), l'identifiant secondaire qu'un outil exportateur attache parfois pour conserver l'identifiant d'origine de son propre référentiel. Elle suit la même convention wrapper/contenu que les références — sauf qu'ici le rôle et le type portent le **même nom**, d'où une forme doublée déroutante :
+
+```xml
+<ALTERNATIVE-ID><ALTERNATIVE-ID IDENTIFIER="DOORS-4711"/></ALTERNATIVE-ID>
+```
+
+`parseAlternativeId` prend le premier élément enfant du wrapper et y lit `IDENTIFIER`, avec repli sur l'attribut porté directement par le wrapper (forme plate, non conforme mais émise par certains outils). Un wrapper sans `IDENTIFIER` exploitable renvoie `undefined` plutôt qu'un objet vide, pour que l'appelant puisse tester le champ lui-même et non son contenu.
+
 ### Construction récursive de la hiérarchie
 
 `SPEC-HIERARCHY` peut contenir récursivement d'autres `SPEC-HIERARCHY` dans son propre `<CHILDREN>` — c'est l'arborescence visible dans l'UI finale. `parseSpecHierarchy` est une fonction récursive directe :
@@ -188,7 +198,7 @@ function xNodeToXhtml(node: XNode): XhtmlNode {
 
 ## 5. Indexation et résolution des références croisées
 
-`ReqIfIndex` (`lookup.ts`) construit, **en un seul passage O(n)** sur le document, huit `Map<Identifier, T>` couvrant chaque famille d'éléments identifiables (types de données, types de spec, définitions d'attributs, valeurs d'énumération, objets, spécifications, nœuds de hiérarchie, relations, groupes de relations) :
+`ReqIfIndex` (`lookup.ts`) construit, **en un seul passage O(n)** sur le document, **onze** `Map`. Neuf sont des index d'identité `Map<Identifier, T>` couvrant chaque famille d'éléments identifiables (types de données, types de spec, définitions d'attributs, valeurs d'énumération, objets, spécifications, nœuds de hiérarchie, relations, groupes de relations) ; les deux dernières sont des index **inversés** `Map<Identifier, SpecRelation[]>` pour les liens entrants/sortants (voir section 8) — la clé n'y est pas l'identifiant de la relation mais celui de l'objet à son extrémité, et la valeur est un tableau :
 
 ```ts
 constructor(doc: ReqIfDocument) {
@@ -468,7 +478,7 @@ Avec *n* = nombre total de nœuds XML du document, *m* = nombre de pièces joint
 |---|---|---|
 | Parsing XML (`fast-xml-parser`) | O(n) | un seul passage linéaire |
 | Construction du modèle (`parse-document.ts`) | O(n) | un passage récursif, miroir direct de l'arbre source |
-| Construction de `ReqIfIndex` | O(n) | un passage, 8 insertions de Map par élément au pire |
+| Construction de `ReqIfIndex` | O(n) | un passage, 11 insertions de Map par élément au pire |
 | Résolution d'une référence (`typeRef`, etc.) | O(1) amorti | lookup de `Map` |
 | Collecte des chemins de pièces jointes | O(n) | un passage sur toutes les valeurs XHTML |
 | Résolution des pièces jointes | O(m) en parallèle | `Promise.all`, borné par la I/O la plus lente, pas la somme |

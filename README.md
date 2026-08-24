@@ -306,7 +306,7 @@ const html = await renderPackageToHtml(pkg, { showRelations: false }); // pour l
 Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'un tiers. `renderXhtmlContent` applique une liste blanche stricte de balises/attributs (alignée sur les modules XHTML autorisés par la spec : Text, List, Hypertext, Edit, Presentation, Basic Tables, Object, Style Attribute) :
 
 - `<script>`, `<style>`, `<iframe>`, formulaires, etc. sont entièrement supprimés (balise **et** contenu) ;
-- les `href`/`src` en `javascript:` ou `vbscript:` sont neutralisés ;
+- les `href`/`src` en `javascript:`, `vbscript:` ou `data:` sont neutralisés (l'attribut est simplement omis, le libellé du lien reste visible). `data:` est inclus parce qu'un `data:text/html` est un vecteur d'exécution au même titre que `javascript:` — seules les `data:` URI **produites par la bibliothèque elle-même** pour les pièces jointes résolues sont émises, et elles ne passent pas par ce filtre ;
 - l'attribut `style` n'autorise que `text-decoration` (underline/line-through) et `color`, conformément à la clause 10.8.20 de la spec — tout le reste est filtré ;
 - l'élément `<object>` (objet externe) suit la chaîne de repli décrite dans la spec : image PNG résolue → sinon objet alternatif imbriqué → sinon texte alternatif.
 
