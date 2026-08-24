@@ -237,7 +237,17 @@ const html = await renderPackageToHtml(pkg, {
 });
 ```
 
-**`layout: "tabs"`** — s'applique à deux niveaux : entre les différents documents `.reqif` d'un même `.reqifz` (`renderPackageToHtml`), et entre les différentes `Specification` à l'intérieur d'un même document (`renderDocumentToHtml`). N'a aucun effet s'il n'y a qu'un seul document/qu'une seule spécification (pas d'onglet inutile pour un cas simple). Implémenté en CSS pur (case à cocher radio masquée + sélecteurs `:checked ~`) — aucun JavaScript, fonctionne même si le HTML est inséré statiquement sans script.
+**`layout: "tabs"`** — s'applique à deux niveaux : entre les différents documents `.reqif` d'un même `.reqifz` (`renderPackageToHtml`), et entre les différentes `Specification` à l'intérieur d'un même document (`renderDocumentToHtml`). N'a aucun effet s'il n'y a qu'un seul document/qu'une seule spécification (pas d'onglet inutile pour un cas simple). Implémenté en CSS pur — aucun JavaScript, fonctionne même si le HTML est inséré statiquement sans script.
+
+Les onglets sont de vrais liens, et c'est **le fragment d'URL qui décide du panneau affiché** (`:target` / `:has(:target)`). Conséquence directe : une ancre profonde ouvre d'elle-même tous les panneaux menant à sa cible, à tous les niveaux d'imbrication à la fois. Un lien de relation vers une exigence d'un autre onglet fonctionne, et une URL comme `…#reqif-obj-SYS-REQ-0042` rouvre le bon document, la bonne spécification, défilée jusqu'à l'exigence — de quoi envoyer un lien précis à un collègue.
+
+Les identifiants de panneaux dérivent des identifiants ReqIF (`#reqif-doc-<header>`, `#reqif-spec-<spec>`), jamais de la position de l'onglet : un lien partagé survit à l'insertion d'un document avant lui.
+
+⚠️ **Deux contreparties assumées**, conséquences de ce que l'état vit désormais dans l'URL de la page hôte :
+- une application hôte qui **route sur le hash** (Vue Router en mode hash, par exemple) verra sa route changer à chaque clic d'onglet ;
+- **deux aperçus sur une même page** ne peuvent plus retenir deux sélections d'onglet indépendantes — un seul fragment, un seul état.
+
+Cliquer un onglet fait par ailleurs défiler vers son panneau : c'est le comportement d'un lien, atténué par `scroll-margin-top` mais pas supprimable. Enfin, ce mécanisme repose sur `:has()`, disponible dans tous les navigateurs depuis décembre 2023.
 
 **`chapterNumbers: true`** — préfixe chaque titre de sa position dans l'arborescence (`1`, `1.1`, `1.1.1`, `1.1.2`, `1.2`, `2`...). La numérotation repart à 1 à chaque nouvelle `Specification`, comme des documents séparés.
 
@@ -322,7 +332,7 @@ const index = new ReqIfIndex(pkg.documents); // et non pkg.document
 const html = await renderDocumentToHtml(doc, pkg.attachments, options, index);
 ```
 
-⚠️ **En `layout: "tabs"`, une ancre vers un objet d'un autre onglet ne révèle pas cet onglet.** Les onglets sont en CSS pur (`display:none` tant que la radio n'est pas cochée) : le navigateur défile vers une cible masquée, sans effet visible. Le lien reste correct, seule la navigation est inopérante — il n'y a pas de correctif sans JavaScript. En `layout: "stacked"` (le défaut), tout fonctionne.
+**Objets rendus plusieurs fois** — un même `SpecObject` peut légalement apparaître à plusieurs endroits d'une arborescence. Seule **la première occurrence porte l'`id`** d'ancrage : c'est déjà ce que fait un navigateur en résolvant un fragment, et émettre le même `id` plusieurs fois produisait un HTML invalide sans rendre les autres occurrences atteignables. Chaque doublon émet un événement `duplicate-dom-id` (voir [`onDegradation`](#diagnostiquer-ce-qui-a-été-dégradé-ondegradation)).
 
 **Limite actuelle** : seules les `SpecRelation` (liens objet-à-objet) sont affichées. Les `RelationGroup` (regroupements de relations entre deux `Specification`) sont parsées (`doc.coreContent.specRelationGroups`) mais pas encore rendues — exploitables directement via le modèle de données si besoin.
 
@@ -354,6 +364,7 @@ Le rendu est strictement identique avec ou sans handler : l'option ne fait que r
 | `attachment-missing` | pièce jointe référencée qu'aucun résolveur ne trouve |
 | `attachment-too-large` | pièce jointe dépassant `maxInlineBytes`, laissée non résolue |
 | `unresolved-reference` | `SpecRelation` visant un objet absent du rendu |
+| `duplicate-dom-id` | objet rendu plusieurs fois ; seule la première occurrence porte l'`id` |
 | `orphan-attribute-value` | valeur dont l'`AttributeDefinition` est absente du `SpecType` déclaré |
 | `missing-spec-object` | nœud d'arborescence pointant vers un `SpecObject` inexistant |
 | `custom-renderer-threw` | un `customAttributeRenderers` a levé et a été ignoré |
