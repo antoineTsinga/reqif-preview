@@ -8,6 +8,7 @@ export {
   type ReqIfInput,
 } from "./load-package.js";
 export { ReqIfIndex } from "./lookup.js";
+export type { DegradationCode, DegradationEvent, DegradationHandler } from "./diagnostics.js";
 export { resolveAttribute, normalizeKey, valueToPlainText } from "./attribute-lookup.js";
 export { extractLifecycleInfo, type LifecycleInfo } from "./lifecycle.js";
 export type { AttributeRenderContext, CustomAttributeRenderer } from "./custom-render.js";

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./escape.js";
+import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import type { XhtmlContent, XhtmlElementNode, XhtmlNode } from "./types.js";
 
 /**
@@ -48,30 +49,48 @@ export interface AttachmentLookup {
 
 export interface XhtmlRenderOptions {
   attachments?: AttachmentLookup;
+  /** Observes what the allowlist removes. See `diagnostics.ts`. */
+  onDegradation?: DegradationHandler;
 }
 
 function escapeAttr(s: string): string {
   return escapeHtml(s).replace(/"/g, "&quot;");
 }
 
-function sanitizeHref(href: string | undefined): string | undefined {
+function sanitizeHref(href: string | undefined, opts: XhtmlRenderOptions): string | undefined {
   if (!href) return undefined;
   const trimmed = href.trim();
-  if (/^(javascript|vbscript|data):/i.test(trimmed)) return undefined;
+  if (/^(javascript|vbscript|data):/i.test(trimmed)) {
+    reportDegradation(opts.onDegradation, "dropped-href", "Link removed: blocked URL scheme.", {
+      href: trimmed,
+    });
+    return undefined;
+  }
   return trimmed;
 }
 
-function sanitizeStyle(style: string | undefined): string | undefined {
+function sanitizeStyle(style: string | undefined, opts: XhtmlRenderOptions): string | undefined {
   if (!style) return undefined;
   const kept: string[] = [];
+  const drop = (prop: string, value: string, why: string) =>
+    reportDegradation(opts.onDegradation, "dropped-style-declaration", why, { prop, value });
   for (const decl of style.split(";")) {
     const idx = decl.indexOf(":");
     if (idx < 0) continue;
     const prop = decl.slice(0, idx).trim().toLowerCase();
     const value = decl.slice(idx + 1).trim().toLowerCase();
-    if (!ALLOWED_STYLE_PROPS.has(prop)) continue;
-    if (prop === "text-decoration" && !SAFE_TEXT_DECORATION.has(value)) continue;
-    if (prop === "color" && !SAFE_COLOR.test(value)) continue;
+    if (!ALLOWED_STYLE_PROPS.has(prop)) {
+      drop(prop, value, `CSS property "${prop}" is not one of the two the spec allows.`);
+      continue;
+    }
+    if (prop === "text-decoration" && !SAFE_TEXT_DECORATION.has(value)) {
+      drop(prop, value, `Unsupported text-decoration value "${value}".`);
+      continue;
+    }
+    if (prop === "color" && !SAFE_COLOR.test(value)) {
+      drop(prop, value, `Unsupported color value "${value}".`);
+      continue;
+    }
     kept.push(`${prop}:${value}`);
   }
   return kept.length ? kept.join(";") : undefined;
@@ -120,20 +139,28 @@ function renderObject(node: XhtmlElementNode, opts: XhtmlRenderOptions): string 
 
 function renderElement(node: XhtmlElementNode, opts: XhtmlRenderOptions): string {
   if (node.tag === "object") return renderObject(node, opts);
-  if (DROP_ENTIRELY_TAGS.has(node.tag)) return "";
+  if (DROP_ENTIRELY_TAGS.has(node.tag)) {
+    reportDegradation(opts.onDegradation, "dropped-tag", `<${node.tag}> removed with its whole subtree.`, {
+      tag: node.tag,
+    });
+    return "";
+  }
 
   if (!ALLOWED_TAGS.has(node.tag)) {
     // Unknown/unsafe tag: drop the wrapper but keep rendering its content.
+    reportDegradation(opts.onDegradation, "unwrapped-tag", `<${node.tag}> unwrapped; its children were kept.`, {
+      tag: node.tag,
+    });
     return renderChildren(node.children, opts);
   }
 
   const attrParts: string[] = [];
-  const style = sanitizeStyle(node.attributes["style"]);
+  const style = sanitizeStyle(node.attributes["style"], opts);
   if (style) attrParts.push(`style="${escapeAttr(style)}"`);
   if (node.attributes["title"]) attrParts.push(`title="${escapeAttr(node.attributes["title"])}"`);
 
   if (node.tag === "a") {
-    const href = sanitizeHref(node.attributes["href"]);
+    const href = sanitizeHref(node.attributes["href"], opts);
     if (href) {
       attrParts.push(`href="${escapeAttr(href)}"`);
       attrParts.push('target="_blank" rel="noopener noreferrer"');

@@ -335,6 +335,40 @@ Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'u
 - l'attribut `style` n'autorise que `text-decoration` (underline/line-through) et `color`, conformément à la clause 10.8.20 de la spec — tout le reste est filtré ;
 - l'élément `<object>` (objet externe) suit la chaîne de repli décrite dans la spec : image PNG résolue → sinon objet alternatif imbriqué → sinon texte alternatif.
 
+## Diagnostiquer ce qui a été dégradé (`onDegradation`)
+
+Passé l'étape de parsing, **rien ne lève** : une entrée surprenante dégrade localement et le reste du document se rend quand même. C'est le bon comportement en production, et pénible en support — face à « il manque des trucs dans mon aperçu », il n'y avait aucun moyen d'obtenir un rapport.
+
+```ts
+const events: DegradationEvent[] = [];
+const html = await renderPackageToHtml(pkg, { onDegradation: (e) => events.push(e) });
+
+// [{ code: "attachment-missing", message: 'No attachment resolved for "schema.png".',
+//    detail: { path: "schema.png" } }, …]
+```
+
+Le rendu est strictement identique avec ou sans handler : l'option ne fait que rendre visibles des décisions déjà prises. Les codes émis :
+
+| Code | Situation |
+|---|---|
+| `attachment-missing` | pièce jointe référencée qu'aucun résolveur ne trouve |
+| `attachment-too-large` | pièce jointe dépassant `maxInlineBytes`, laissée non résolue |
+| `unresolved-reference` | `SpecRelation` visant un objet absent du rendu |
+| `orphan-attribute-value` | valeur dont l'`AttributeDefinition` est absente du `SpecType` déclaré |
+| `missing-spec-object` | nœud d'arborescence pointant vers un `SpecObject` inexistant |
+| `custom-renderer-threw` | un `customAttributeRenderers` a levé et a été ignoré |
+| `custom-renderer-unbalanced-html` | HTML personnalisé mal fermé, échappé en texte |
+| `dropped-tag` | balise supprimée avec son sous-arbre (`<script>`, `<iframe>`…) |
+| `unwrapped-tag` | balise hors liste blanche déballée, enfants conservés |
+| `dropped-style-declaration` | déclaration `style` invalide abandonnée |
+| `dropped-href` | `href` en `javascript:`/`vbscript:`/`data:` neutralisé |
+| `unparsable-date` | date non analysable, affichée telle quelle |
+| `invalid-locale` | `Intl` a rejeté la locale configurée |
+
+⚠️ `dropped-tag` et `unwrapped-tag` peuvent se déclencher **des milliers de fois** sur un gros export : c'est un canal de diagnostic, pas un journal de production. Filtrez par code, ou n'activez l'option qu'en investigation.
+
+Un handler qui lève est intercepté et ignoré — un canal de diagnostic qui casse ce qu'il observe serait pire que pas de canal du tout.
+
 ## API
 
 | Export | Description |
@@ -345,7 +379,7 @@ Le contenu XHTML d'un fichier ReqIF est une donnée **non fiable** provenant d'u
 | `renderPackageToHtml(pkg, options?)` | Rendu HTML complet (tous les documents du package). |
 | `renderDocumentToHtml(doc, attachments, options?)` | Rendu HTML d'un seul document. |
 | `renderSpecification(spec, index, attachments, labels?, options?)` | Rendu HTML d'une seule arborescence de spécification (sync, pour UI virtualisée). |
-| `createAttachmentLookup(doc, resolver, maxInlineBytes?)` | Pré-résout les pièces jointes en `data:` URI — nécessaire pour alimenter `renderSpecification`, qui est synchrone. |
+| `createAttachmentLookup(doc, resolver, maxInlineBytes?, onDegradation?)` | Pré-résout les pièces jointes en `data:` URI — nécessaire pour alimenter `renderSpecification`, qui est synchrone. |
 | `renderXhtmlContent(content, options?)` | Sérialisation assainie d'un fragment XHTML isolé. |
 | `xhtmlToPlainText(content)` | Extraction texte brut d'un fragment XHTML. |
 | `createAttachmentResolver(fn)` | Construit un résolveur de pièces jointes personnalisé. |

@@ -12,6 +12,7 @@ import {
   resolveAttribute,
   valueToPlainText,
   createAttachmentLookup,
+  type DegradationEvent,
 } from "../src/index.js";
 import { SYNTHETIC_REQIF, TINY_PNG_BASE64 } from "./fixtures.js";
 
@@ -1140,5 +1141,90 @@ describe("model completeness: EDITABLE-ATTS, alternative ids, attachment lookup"
 
     const html = renderSpecification(pkg.document.coreContent.specifications[0], index, lookup);
     expect(html).toMatch(/<img src="data:image\/png;base64,[A-Za-z0-9+/=]+"/);
+  });
+});
+
+describe("onDegradation: making the silent fallbacks observable", () => {
+  function collect() {
+    const events: DegradationEvent[] = [];
+    return { events, onDegradation: (e: DegradationEvent) => events.push(e) };
+  }
+  const codes = (events: DegradationEvent[]) => events.map((e) => e.code);
+
+  it("reports a referenced attachment that no resolver can find", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF); // no zip, so no attachments at all
+    const { events, onDegradation } = collect();
+    await renderPackageToHtml(pkg, { onDegradation });
+    const missing = events.filter((e) => e.code === "attachment-missing");
+    expect(missing.length).toBeGreaterThan(0);
+    expect(missing[0].detail?.path).toBe("diagram.png");
+  });
+
+  it("reports an attachment skipped for exceeding maxInlineBytes", async () => {
+    const zipBytes = zipSync({
+      "model.reqif": strToU8(SYNTHETIC_REQIF),
+      "diagram.png": base64ToBytes(TINY_PNG_BASE64),
+    });
+    const pkg = await loadReqIfPackage(zipBytes);
+    const { events, onDegradation } = collect();
+    await renderPackageToHtml(pkg, { onDegradation, maxInlineBytes: 1 });
+    expect(codes(events)).toContain("attachment-too-large");
+  });
+
+  it("reports tags the allowlist drops and tags it unwraps", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    await renderPackageToHtml(pkg, { onDegradation });
+    // the synthetic fixture carries a <script> and a <font> inside its XHTML
+    expect(codes(events)).toContain("dropped-tag");
+    expect(events.find((e) => e.code === "dropped-tag")?.detail?.tag).toBe("script");
+  });
+
+  it("reports a custom renderer that throws, and one that returns unbalanced HTML", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    await renderPackageToHtml(pkg, {
+      onDegradation,
+      customAttributeRenderers: [
+        { attribute: "Name", render: () => { throw new Error("boom"); } },
+        { attribute: "Count", position: "after", render: () => "<div>never closed" },
+      ],
+    });
+    expect(codes(events)).toContain("custom-renderer-threw");
+    expect(codes(events)).toContain("custom-renderer-unbalanced-html");
+  });
+
+  it("reports a relation whose target is nowhere in the render", async () => {
+    const doc = parseReqIfXml(`<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <THE-HEADER><REQ-IF-HEADER IDENTIFIER="h1"><REQ-IF-VERSION>1.0</REQ-IF-VERSION></REQ-IF-HEADER></THE-HEADER>
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES/><SPEC-TYPES><SPEC-OBJECT-TYPE IDENTIFIER="t1" LONG-NAME="T"><SPEC-ATTRIBUTES/></SPEC-OBJECT-TYPE></SPEC-TYPES>
+    <SPEC-OBJECTS><SPEC-OBJECT IDENTIFIER="o1" LONG-NAME="Source"><VALUES/><TYPE><SPEC-OBJECT-TYPE-REF>t1</SPEC-OBJECT-TYPE-REF></TYPE></SPEC-OBJECT></SPEC-OBJECTS>
+    <SPECIFICATIONS><SPECIFICATION IDENTIFIER="s1" LONG-NAME="S"><CHILDREN>
+      <SPEC-HIERARCHY IDENTIFIER="sh1"><OBJECT><SPEC-OBJECT-REF>o1</SPEC-OBJECT-REF></OBJECT></SPEC-HIERARCHY>
+    </CHILDREN></SPECIFICATION></SPECIFICATIONS>
+    <SPEC-RELATIONS><SPEC-RELATION IDENTIFIER="rel1">
+      <TYPE><SPEC-RELATION-TYPE-REF>missing-type</SPEC-RELATION-TYPE-REF></TYPE>
+      <SOURCE><SPEC-OBJECT-REF>o1</SPEC-OBJECT-REF></SOURCE>
+      <TARGET><SPEC-OBJECT-REF>ghost</SPEC-OBJECT-REF></TARGET>
+    </SPEC-RELATION></SPEC-RELATIONS><SPEC-RELATION-GROUPS/>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>`);
+    const { events, onDegradation } = collect();
+    await renderDocumentToHtml(doc, { resolve: () => undefined, list: () => [] }, { onDegradation });
+    const unresolved = events.filter((e) => e.code === "unresolved-reference");
+    expect(unresolved).toHaveLength(1);
+    expect(unresolved[0].detail?.targetRef).toBe("ghost");
+  });
+
+  it("stays silent when no handler is supplied, and survives one that throws", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const withoutHandler = await renderPackageToHtml(pkg);
+    const withHostileHandler = await renderPackageToHtml(pkg, {
+      onDegradation: () => { throw new Error("handler exploded"); },
+    });
+    // A diagnostic channel that can break what it observes is worse than none.
+    expect(withHostileHandler).toBe(withoutHandler);
   });
 });

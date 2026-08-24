@@ -2,6 +2,7 @@ import { resolveAttribute } from "./attribute-lookup.js";
 import { escapeHtml } from "./escape.js";
 import { isBalancedHtml } from "./html-balance.js";
 import { ReqIfIndex } from "./lookup.js";
+import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import type { AttachmentLookup } from "./sanitize.js";
 import type { AttributeDefinition, AttributeValue, SpecObject, SpecType } from "./types.js";
 
@@ -74,6 +75,7 @@ export function renderCustomAttributes(
   renderers: CustomAttributeRenderer[] | undefined,
   position: "before" | "after",
   ctx: AttributeRenderContext,
+  onDegradation?: DegradationHandler,
 ): string {
   if (!renderers?.length) return "";
   const parts: string[] = [];
@@ -83,8 +85,14 @@ export function renderCustomAttributes(
     let html: string | undefined;
     try {
       html = renderer.render(value, ctx);
-    } catch {
+    } catch (error) {
       // A misbehaving consumer-supplied renderer must never break the whole preview.
+      reportDegradation(
+        onDegradation,
+        "custom-renderer-threw",
+        `The renderer for attribute "${renderer.attribute}" threw; it was skipped for this object.`,
+        { attribute: renderer.attribute, specObject: ctx.specObject.identifier, error: String(error) },
+      );
       continue;
     }
     if (!html) continue;
@@ -102,6 +110,12 @@ export function renderCustomAttributes(
           html,
         );
       }
+      reportDegradation(
+        onDegradation,
+        "custom-renderer-unbalanced-html",
+        `The HTML returned for attribute "${renderer.attribute}" has unbalanced tags; it was escaped as plain text.`,
+        { attribute: renderer.attribute, specObject: ctx.specObject.identifier, html },
+      );
       html = escapeHtml(html);
     }
 

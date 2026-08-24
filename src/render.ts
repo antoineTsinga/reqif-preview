@@ -4,6 +4,7 @@ import { escapeHtml } from "./escape.js";
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
 import { renderTabs } from "./tabs.js";
+import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import {
   buildAttributeRenderContext,
   collectHiddenDefinitionIds,
@@ -186,6 +187,15 @@ export interface RenderOptions {
    */
   showRelations?: boolean;
   /**
+   * Observe everything the renderer silently degrades — a missing attachment,
+   * an unresolvable relation, a tag the allowlist strips, a custom renderer
+   * that threw. Nothing about the output changes; this only makes those
+   * decisions visible, which is otherwise impossible to diagnose. Note that
+   * tag-level events can fire thousands of times on a large export: this is a
+   * diagnostic channel, not a production log.
+   */
+  onDegradation?: DegradationHandler;
+  /**
    * Display the simplified rendition of an XHTML value rather than the
    * original it stands in for (10.8.20 `theOriginalValue`). Default: false —
    * this renderer handles the full XHTML subset the spec allows, so it does
@@ -248,7 +258,12 @@ export async function renderDocumentToHtml(
 ): Promise<string> {
   const labels: RenderLabels = { ...DEFAULT_LABELS, ...options.labels };
   const index = sharedIndex ?? new ReqIfIndex(doc);
-  const lookup = await createAttachmentLookup(doc, attachments, options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES);
+  const lookup = await createAttachmentLookup(
+    doc,
+    attachments,
+    options.maxInlineBytes ?? DEFAULT_MAX_INLINE_BYTES,
+    options.onDegradation,
+  );
 
   const header = options.readingMode ? "" : renderHeader(doc, labels);
   const specHtmls = doc.coreContent.specifications.map((spec) => renderSpecification(spec, index, lookup, labels, options));
@@ -293,12 +308,19 @@ function escapeAttr(s: string): string {
 }
 
 /** Formats an ISO date/datetime for display; falls back to the raw string if it can't be parsed. */
-function formatDate(iso: string, locale: string): string {
+function formatDate(iso: string, locale: string, onDegradation?: DegradationHandler): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
+  if (Number.isNaN(d.getTime())) {
+    reportDegradation(onDegradation, "unparsable-date", "Date shown verbatim: not a parsable date.", { value: iso });
+    return iso;
+  }
   try {
     return new Intl.DateTimeFormat(locale, { dateStyle: "medium" } as Intl.DateTimeFormatOptions).format(d);
   } catch {
+    reportDegradation(onDegradation, "invalid-locale", `Intl rejected the locale "${locale}"; date shown verbatim.`, {
+      locale,
+      value: iso,
+    });
     return iso;
   }
 }
@@ -416,6 +438,14 @@ function renderHierarchyNode(
   const suppressTitle = chapterShortcut || !!options.isTitleless?.(obj, specType, index);
   const suppressContent = chapterShortcut || (!!obj && !!options.isContentless?.(obj, specType, index));
 
+  if (!obj) {
+    reportDegradation(
+      options.onDegradation,
+      "missing-spec-object",
+      `Tree node "${node.identifier}" points at SpecObject "${node.objectRef}", which is not in the render.`,
+      { specHierarchy: node.identifier, objectRef: node.objectRef },
+    );
+  }
   const body = obj
     ? renderSpecObjectBody(obj, index, attachments, labels, options, isChapter, suppressContent)
     : `<p class="reqif-missing">${labels.noContent}</p>`;
@@ -510,16 +540,16 @@ function renderSimpleView(
   const idHtml = options.readingMode
     ? ""
     : `<div class="reqif-id">${escapeHtml(labels.idLabel)}: <code>${escapeHtml(displayId)}</code></div>`;
-  const metaHtml = options.readingMode ? "" : renderLifecycleMeta(lifecycle, labels, dateLocale);
+  const metaHtml = options.readingMode ? "" : renderLifecycleMeta(lifecycle, labels, dateLocale, options.onDegradation);
 
   const formatValue = (value: AttributeValue | undefined) =>
     value ? renderAttributeValue(value, index, attachments, labels, options) : "";
   const ctx = buildAttributeRenderContext(obj, specType, index, attachments, formatValue, isChapter);
-  const before = renderCustomAttributes(options.customAttributeRenderers, "before", ctx);
-  const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx);
+  const before = renderCustomAttributes(options.customAttributeRenderers, "before", ctx, options.onDegradation);
+  const after = renderCustomAttributes(options.customAttributeRenderers, "after", ctx, options.onDegradation);
 
   const contentHtml = resolveContentHtml(obj, index, attachments, labels, lifecycle, options);
-  const relationsHtml = options.showRelations === false ? "" : renderRelations(obj, index, labels);
+  const relationsHtml = options.showRelations === false ? "" : renderRelations(obj, index, labels, options.onDegradation);
   const emptyContentHtml = suppressContent ? "" : `<p class="reqif-empty">${escapeHtml(labels.noContent)}</p>`;
 
   return (
@@ -538,14 +568,21 @@ function renderSimpleView(
  * somewhere in the same output (see `domId`); otherwise its title/id is
  * still shown, just not as a link.
  */
-function renderRelations(obj: SpecObject, index: ReqIfIndex, labels: RenderLabels): string {
+function renderRelations(
+  obj: SpecObject,
+  index: ReqIfIndex,
+  labels: RenderLabels,
+  onDegradation?: DegradationHandler,
+): string {
   const outgoing = index.outgoingRelations.get(obj.identifier) ?? [];
   const incoming = index.incomingRelations.get(obj.identifier) ?? [];
   if (outgoing.length === 0 && incoming.length === 0) return "";
 
   const rows: string[] = [];
-  for (const rel of outgoing) rows.push(renderRelationRow("\u2192", rel, index.specObjects.get(rel.targetRef), index, labels));
-  for (const rel of incoming) rows.push(renderRelationRow("\u2190", rel, index.specObjects.get(rel.sourceRef), index, labels));
+  for (const rel of outgoing)
+    rows.push(renderRelationRow("\u2192", rel, index.specObjects.get(rel.targetRef), index, labels, onDegradation));
+  for (const rel of incoming)
+    rows.push(renderRelationRow("\u2190", rel, index.specObjects.get(rel.sourceRef), index, labels, onDegradation));
 
   return (
     `<div class="reqif-relations">` +
@@ -561,8 +598,17 @@ function renderRelationRow(
   other: SpecObject | undefined,
   index: ReqIfIndex,
   labels: RenderLabels,
+  onDegradation?: DegradationHandler,
 ): string {
   const typeName = index.specTypes.get(relation.typeRef)?.longName ?? labels.relationFallbackType;
+  if (!other) {
+    reportDegradation(
+      onDegradation,
+      "unresolved-reference",
+      `Relation "${relation.identifier}" points at a SpecObject absent from the render; shown without a link.`,
+      { relation: relation.identifier, sourceRef: relation.sourceRef, targetRef: relation.targetRef },
+    );
+  }
   const otherLabel = other?.longName || other?.identifier || labels.relationUnresolved;
   const target = other
     ? `<a class="reqif-relation-target" href="#${escapeAttr(domId(other.identifier))}">${escapeHtml(otherLabel)}</a>`
@@ -602,7 +648,7 @@ function resolveContentHtml(
       let html: string;
       if (value.kind === "XHTML") {
         const content = displayXhtml(value, options);
-        html = content ? renderXhtmlContent(content, { attachments }) : "";
+        html = content ? renderXhtmlContent(content, { attachments, onDegradation: options.onDegradation }) : "";
       } else {
         html = renderAttributeValue(value, index, attachments, labels, options);
       }
@@ -617,7 +663,7 @@ function resolveContentHtml(
     if (lifecycle.consumedDefinitionIds.has(v.definitionRef)) continue;
     const content = displayXhtml(v, options);
     if (!content) continue;
-    parts.push(`<div class="reqif-content">${renderXhtmlContent(content, { attachments })}</div>`);
+    parts.push(`<div class="reqif-content">${renderXhtmlContent(content, { attachments, onDegradation: options.onDegradation })}</div>`);
   }
   return parts.join("");
 }
@@ -627,6 +673,7 @@ function renderLifecycleMeta(
   lifecycle: ReturnType<typeof extractLifecycleInfo>,
   labels: RenderLabels,
   dateLocale: string,
+  onDegradation?: DegradationHandler,
 ): string {
   const createdChip = lifecycleChip(
     lifecycle.createdBy,
@@ -634,6 +681,7 @@ function renderLifecycleMeta(
     labels.createdByLabel,
     labels.createdOnLabel,
     dateLocale,
+    onDegradation,
   );
 
   const isSameAsCreated =
@@ -646,6 +694,7 @@ function renderLifecycleMeta(
         labels.modifiedByLabel,
         labels.modifiedOnLabel,
         dateLocale,
+        onDegradation,
       );
 
   const chips = [createdChip, modifiedChip].filter((c): c is string => !!c);
@@ -659,12 +708,13 @@ function lifecycleChip(
   byLabel: string,
   onLabel: string,
   dateLocale: string,
+  onDegradation?: DegradationHandler,
 ): string | undefined {
   if (!by && !on) return undefined;
   const role = by ? byLabel : onLabel;
   const bits = [`<span class="reqif-meta-role">${escapeHtml(role)}</span>`];
   if (by) bits.push(`<strong>${escapeHtml(by)}</strong>`);
-  if (on) bits.push(`<time datetime="${escapeAttr(on)}">${escapeHtml(formatDate(on, dateLocale))}</time>`);
+  if (on) bits.push(`<time datetime="${escapeAttr(on)}">${escapeHtml(formatDate(on, dateLocale, onDegradation))}</time>`);
   return `<span class="reqif-meta-chip">${bits.join(" ")}</span>`;
 }
 
@@ -696,6 +746,12 @@ function renderTechnicalPanel(
   }
   for (const value of obj.values) {
     if (seen.has(value.definitionRef) || hidden.has(value.definitionRef)) continue;
+    reportDegradation(
+      options.onDegradation,
+      "orphan-attribute-value",
+      `Value on "${obj.identifier}" references AttributeDefinition "${value.definitionRef}", absent from its declared SpecType. Shown with its raw id.`,
+      { specObject: obj.identifier, definitionRef: value.definitionRef, specType: specType?.identifier },
+    );
     const html = renderAttributeRow(undefined, value, index, attachments, labels, options);
     if (html) rows.push(html);
   }
@@ -750,7 +806,7 @@ function renderAttributeValue(
       return index.enumLabels(value.valueRefs).map(escapeHtml).join(", ");
     case "XHTML": {
       const content = displayXhtml(value, options);
-      return content ? renderXhtmlContent(content, { attachments }) : "";
+      return content ? renderXhtmlContent(content, { attachments, onDegradation: options.onDegradation }) : "";
     }
     default:
       return "";
@@ -775,6 +831,7 @@ export async function createAttachmentLookup(
   doc: ReqIfDocument,
   resolver: AttachmentResolver,
   maxInlineBytes: number = DEFAULT_MAX_INLINE_BYTES,
+  onDegradation?: DegradationHandler,
 ): Promise<AttachmentLookup> {
   const paths = new Set<string>();
   for (const content of collectAllXhtmlContents(doc)) collectReferencedPaths(content, paths);
@@ -783,8 +840,20 @@ export async function createAttachmentLookup(
   await Promise.all(
     [...paths].map(async (path) => {
       const attachment = resolver.resolve(path);
-      if (!attachment) return;
-      if (attachment.size > maxInlineBytes) return; // too big to inline; left unresolved on purpose
+      if (!attachment) {
+        reportDegradation(onDegradation, "attachment-missing", `No attachment resolved for "${path}".`, { path });
+        return;
+      }
+      if (attachment.size > maxInlineBytes) {
+        // too big to inline; left unresolved on purpose
+        reportDegradation(
+          onDegradation,
+          "attachment-too-large",
+          `Attachment "${path}" (${attachment.size} bytes) exceeds maxInlineBytes (${maxInlineBytes}).`,
+          { path, size: attachment.size, maxInlineBytes },
+        );
+        return;
+      }
       const bytes = await attachment.getBytes();
       const mimeType = attachment.mimeType ?? "application/octet-stream";
       resolved.set(path, { href: `data:${mimeType};base64,${toBase64(bytes)}`, mimeType });
