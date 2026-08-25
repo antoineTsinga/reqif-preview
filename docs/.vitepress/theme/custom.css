@@ -40,3 +40,26 @@
 .vp-doc .reqif-preview {
   overflow-wrap: anywhere;
 }
+
+/**
+ * The sandbox page runs wider than the rest of the site. A ReqIF preview is a
+ * deeply indented tree of cards; at the default layout width the requirement
+ * text ends up in a column barely wider than the indentation leading to it.
+ *
+ * `--vp-layout-max-width` is the variable VitePress's own padding calc reads,
+ * so raising it is the supported lever — no override of a scoped-style rule,
+ * nothing that breaks when the theme's style hashes change. The page also sets
+ * `aside: false`, which is what removes the 688px `.content-container` cap; the
+ * two are needed together.
+ *
+ * The media query is NOT decoration. VitePress floors the sidebar's offset at
+ * 32px but does not floor the content's, so below the layout max width the two
+ * diverge and the article slides under the sidebar — measured at a 1584px
+ * viewport: padding-left 184px against a sidebar reaching 304px. Widening is
+ * therefore only safe once the viewport actually exceeds the new maximum.
+ */
+@media (min-width: 1800px) {
+  .sandbox-page {
+    --vp-layout-max-width: 1760px;
+  }
+}

@@ -8,6 +8,11 @@
  * scripts/sync-docs-assets.mjs at build time, so they can never lag behind
  * src/. That is the whole point: the page this replaces was a hand-pasted
  * copy that silently went two months stale.
+ *
+ * Layout note: the controls sit in a toolbar ABOVE the output, not in a side
+ * column. A ReqIF preview is a wide, deeply indented tree — every pixel taken
+ * by a control column is taken from the thing being demonstrated. The page
+ * also sets `aside: false` so VitePress drops its 688px content cap.
  */
 import { computed, onMounted, ref, shallowRef, watch } from "vue";
 
@@ -26,6 +31,7 @@ const dragging = ref(false);
 const events = ref<Degradation[]>([]);
 const copied = ref(false);
 const rightTab = ref<"apercu" | "code" | "diagnostics">("apercu");
+const showAdvanced = ref(false);
 
 // --- Options exposed by the sandbox -----------------------------------------
 const layout = ref<"stacked" | "tabs">("stacked");
@@ -38,6 +44,15 @@ const showRelations = ref(true);
 const dateLocale = ref("fr-FR");
 const contentAttributes = ref("");
 const titleAttributes = ref("");
+
+/** The boolean options, as toggle chips. */
+const toggles = [
+  { model: readingMode, label: "readingMode", hint: "Vue de lecture" },
+  { model: chapterNumbers, label: "chapterNumbers", hint: "Numéroter 1, 1.1, 1.2…" },
+  { model: showTechnicalByDefault, label: "showTechnicalByDefault", hint: "Panneau technique ouvert" },
+  { model: preferSimplifiedXhtml, label: "preferSimplifiedXhtml", hint: "Version simplifiée plutôt que l'original" },
+  { model: showRelations, label: "showRelations", hint: "Liens entre exigences" },
+];
 
 /** "a, b" -> ["a", "b"]; blank -> undefined, so the option stays at its default. */
 function list(raw: string): string[] | undefined {
@@ -67,6 +82,8 @@ const renderOptions = computed(() => {
   return o;
 });
 
+const changedCount = computed(() => Object.keys(renderOptions.value).length);
+
 /** The snippet that reproduces exactly what the preview pane is showing. */
 const snippet = computed(() => {
   const entries = Object.entries(renderOptions.value);
@@ -77,9 +94,7 @@ const pkg = await loadReqIfPackage(bytes);
   if (entries.length === 0) {
     return `${head}const html = await renderPackageToHtml(pkg);`;
   }
-  const body = entries
-    .map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`)
-    .join("\n");
+  const body = entries.map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n");
   return `${head}const html = await renderPackageToHtml(pkg, {\n${body}\n});`;
 });
 
@@ -185,126 +200,149 @@ watch(renderOptions, render, { deep: true });
 </script>
 
 <template>
-  <div class="pg">
-    <!-- Controls ------------------------------------------------------------->
-    <aside class="pg-controls">
-      <div class="pg-block">
-        <label class="pg-legend">Fichier</label>
-        <input
-          class="pg-file"
-          type="file"
-          accept=".reqif,.reqifz,.xml"
-          @change="onFile"
-        />
-        <button class="pg-btn" type="button" @click="loadSample">
-          Recharger l'exemple
+  <div
+    class="pg"
+    :class="{ 'pg-dragging': dragging }"
+    @dragover.prevent="dragging = true"
+    @dragleave="dragging = false"
+    @drop.prevent="onDrop"
+  >
+    <!-- Toolbar --------------------------------------------------------------->
+    <div class="pg-bar">
+      <div class="pg-bar-row">
+        <label class="pg-btn pg-btn-primary">
+          <input type="file" accept=".reqif,.reqifz,.xml" hidden @change="onFile" />
+          Ouvrir un fichier…
+        </label>
+        <button class="pg-btn" type="button" @click="loadSample">Exemple</button>
+
+        <span class="pg-sep" aria-hidden="true"></span>
+
+        <div class="pg-seg" role="group" aria-label="layout">
+          <button
+            type="button"
+            :class="{ on: layout === 'stacked' }"
+            @click="layout = 'stacked'"
+            title="Documents et spécifications les uns sous les autres"
+          >
+            stacked
+          </button>
+          <button
+            type="button"
+            :class="{ on: layout === 'tabs' }"
+            @click="layout = 'tabs'"
+            title="Onglets CSS pilotés par le fragment d'URL"
+          >
+            tabs
+          </button>
+        </div>
+
+        <span class="pg-sep" aria-hidden="true"></span>
+
+        <button
+          v-for="t in toggles"
+          :key="t.label"
+          class="pg-chip"
+          type="button"
+          role="switch"
+          :aria-checked="t.model.value"
+          :class="{ on: t.model.value }"
+          :title="t.hint"
+          @click="t.model.value = !t.model.value"
+        >
+          {{ t.label }}
         </button>
-        <p class="pg-hint">
-          Votre fichier ne quitte jamais votre navigateur : tout est calculé
-          localement, il n'y a aucun serveur derrière cette page.
-        </p>
+
+        <span class="pg-spacer"></span>
+
+        <button
+          class="pg-btn pg-btn-ghost"
+          type="button"
+          :aria-expanded="showAdvanced"
+          @click="showAdvanced = !showAdvanced"
+        >
+          Attributs {{ showAdvanced ? "▴" : "▾" }}
+        </button>
+        <button
+          class="pg-btn pg-btn-ghost"
+          type="button"
+          :disabled="changedCount === 0"
+          @click="reset"
+        >
+          Réinitialiser
+        </button>
       </div>
 
-      <div class="pg-block">
-        <label class="pg-legend">Mise en page</label>
-        <label class="pg-row">
-          <span>layout</span>
-          <select v-model="layout">
-            <option value="stacked">stacked</option>
-            <option value="tabs">tabs</option>
-          </select>
-        </label>
-        <label class="pg-check">
-          <input v-model="readingMode" type="checkbox" />
-          <span><code>readingMode</code> — vue de lecture</span>
-        </label>
-        <label class="pg-check">
-          <input v-model="chapterNumbers" type="checkbox" />
-          <span><code>chapterNumbers</code> — 1, 1.1, 1.2…</span>
-        </label>
-        <label class="pg-row" v-if="chapterNumbers">
-          <span>chapterNumberAttributes</span>
-          <input v-model="chapterNumberAttributes" type="text" placeholder="ChapterName" />
-        </label>
-      </div>
-
-      <div class="pg-block">
-        <label class="pg-legend">Contenu</label>
-        <label class="pg-check">
-          <input v-model="showTechnicalByDefault" type="checkbox" />
-          <span><code>showTechnicalByDefault</code></span>
-        </label>
-        <label class="pg-check">
-          <input v-model="preferSimplifiedXhtml" type="checkbox" />
-          <span><code>preferSimplifiedXhtml</code></span>
-        </label>
-        <label class="pg-check">
-          <input v-model="showRelations" type="checkbox" />
-          <span><code>showRelations</code></span>
-        </label>
-        <label class="pg-row">
+      <div v-show="showAdvanced" class="pg-bar-row pg-advanced">
+        <label class="pg-field">
           <span>contentAttributes</span>
           <input v-model="contentAttributes" type="text" placeholder="ReqIF.Text" />
         </label>
-        <label class="pg-row">
+        <label class="pg-field">
           <span>titleAttributes</span>
           <input v-model="titleAttributes" type="text" placeholder="ChapterName" />
         </label>
-        <label class="pg-row">
+        <label class="pg-field">
+          <span>chapterNumberAttributes</span>
+          <input
+            v-model="chapterNumberAttributes"
+            type="text"
+            placeholder="ChapterName"
+            :disabled="!chapterNumbers"
+          />
+        </label>
+        <label class="pg-field pg-field-narrow">
           <span>dateLocale</span>
           <input v-model="dateLocale" type="text" placeholder="fr-FR" />
         </label>
+        <p class="pg-hint">
+          Plusieurs valeurs séparées par des virgules, dans l'ordre voulu. Laisser vide
+          garde le comportement par défaut. <code>chapterNumberAttributes</code> n'a
+          d'effet qu'avec <code>chapterNumbers</code>.
+        </p>
       </div>
-
-      <button class="pg-btn pg-btn-ghost" type="button" @click="reset">
-        Réinitialiser les options
-      </button>
-    </aside>
+    </div>
 
     <!-- Output --------------------------------------------------------------->
-    <section
-      class="pg-output"
-      :class="{ 'pg-dragging': dragging }"
-      @dragover.prevent="dragging = true"
-      @dragleave="dragging = false"
-      @drop.prevent="onDrop"
-    >
-      <nav class="pg-tabs">
-        <button :class="{ on: rightTab === 'apercu' }" @click="rightTab = 'apercu'">
-          Aperçu
-        </button>
-        <button :class="{ on: rightTab === 'code' }" @click="rightTab = 'code'">
-          Code
-        </button>
-        <button :class="{ on: rightTab === 'diagnostics' }" @click="rightTab = 'diagnostics'">
-          Diagnostics
-          <span v-if="events.length" class="pg-badge">{{ groupedEvents.length }}</span>
-        </button>
-        <span class="pg-status">{{ busy ? "rendu en cours…" : status }}</span>
-      </nav>
+    <nav class="pg-tabs">
+      <button :class="{ on: rightTab === 'apercu' }" @click="rightTab = 'apercu'">Aperçu</button>
+      <button :class="{ on: rightTab === 'code' }" @click="rightTab = 'code'">
+        Code
+        <span v-if="changedCount" class="pg-badge pg-badge-soft">{{ changedCount }}</span>
+      </button>
+      <button :class="{ on: rightTab === 'diagnostics' }" @click="rightTab = 'diagnostics'">
+        Diagnostics
+        <span v-if="groupedEvents.length" class="pg-badge">{{ groupedEvents.length }}</span>
+      </button>
+      <span class="pg-status">{{ busy ? "rendu en cours…" : status }}</span>
+    </nav>
 
-      <p v-if="error" class="pg-error">{{ error }}</p>
+    <p v-if="error" class="pg-error">{{ error }}</p>
 
-      <div v-show="rightTab === 'apercu'" class="pg-pane">
-        <p class="pg-drop-hint">Déposez un <code>.reqif</code> / <code>.reqifz</code> ici.</p>
+    <div class="pg-pane">
+      <div v-show="rightTab === 'apercu'">
         <!-- The library's output is HTML it generated itself, from content it
              sanitized itself — that is exactly what this pane exists to show. -->
         <div class="pg-render" v-html="html" />
+        <p class="pg-drop-hint">
+          Déposez un <code>.reqif</code> ou un <code>.reqifz</code> n'importe où sur ce
+          bloc pour le remplacer.
+        </p>
       </div>
 
-      <div v-show="rightTab === 'code'" class="pg-pane">
+      <div v-show="rightTab === 'code'">
         <button class="pg-copy" type="button" @click="copySnippet">
           {{ copied ? "Copié" : "Copier" }}
         </button>
         <pre class="pg-code"><code>{{ snippet }}</code></pre>
         <p class="pg-hint">
-          Ce code produit exactement l'aperçu ci-contre. Les options laissées à
-          leur valeur par défaut n'y apparaissent pas.
+          Ce code produit exactement l'aperçu ci-dessus. Les options laissées à leur valeur
+          par défaut n'y apparaissent pas.
         </p>
       </div>
 
-      <div v-show="rightTab === 'diagnostics'" class="pg-pane">
-        <p v-if="!events.length" class="pg-hint">
+      <div v-show="rightTab === 'diagnostics'">
+        <p v-if="!groupedEvents.length" class="pg-hint">
           Aucune dégradation sur ce fichier avec ces options.
         </p>
         <table v-else class="pg-diag">
@@ -320,151 +358,180 @@ watch(renderOptions, render, { deep: true });
           </tbody>
         </table>
         <p class="pg-hint">
-          Ce tableau est alimenté en direct par <code>onDegradation</code>. Le
-          rendu est strictement identique avec ou sans ce gestionnaire : l'option
-          ne fait que rendre visibles des décisions déjà prises.
+          Alimenté en direct par <code>onDegradation</code>. Le rendu est strictement
+          identique avec ou sans ce gestionnaire : l'option ne fait que rendre visibles des
+          décisions déjà prises.
         </p>
       </div>
-    </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .pg {
-  display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
   margin: 24px 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-c-bg);
 }
-@media (max-width: 900px) {
-  .pg { grid-template-columns: minmax(0, 1fr); }
+.pg-dragging {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 0 0 3px var(--vp-c-brand-soft);
 }
 
-/* Controls ------------------------------------------------------------------*/
-.pg-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  position: sticky;
-  top: 80px;
-}
-@media (max-width: 900px) {
-  .pg-controls { position: static; }
-}
-.pg-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
+/* Toolbar -------------------------------------------------------------------*/
+.pg-bar {
+  border-bottom: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg-soft);
 }
-.pg-legend {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--vp-c-text-2);
+.pg-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
 }
-.pg-row {
+.pg-advanced {
+  align-items: flex-end;
+  gap: 12px;
+  border-top: 1px dashed var(--vp-c-divider);
+}
+.pg-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 4px;
+  background: var(--vp-c-divider);
+}
+.pg-spacer { flex: 1 1 auto; }
+
+.pg-btn {
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pg-btn:hover { border-color: var(--vp-c-brand-1); }
+.pg-btn-primary {
+  color: var(--vp-c-white);
+  background: var(--vp-c-brand-1);
+  border-color: transparent;
+}
+.pg-btn-primary:hover { background: var(--vp-c-brand-2); }
+.pg-btn-ghost { color: var(--vp-c-text-2); background: transparent; }
+.pg-btn:disabled { opacity: 0.45; cursor: default; border-color: var(--vp-c-divider); }
+
+/* Segmented control for the one non-boolean enum. */
+.pg-seg {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 7px;
+}
+.pg-seg button {
+  padding: 4px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--vp-font-family-mono);
+  color: var(--vp-c-text-2);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.pg-seg button.on {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
+/* Boolean options: pressed-looking pills, so the active set is readable at a
+   glance instead of being a column of identical checkboxes. */
+.pg-chip {
+  padding: 5px 10px;
+  font-size: 12.5px;
+  font-family: var(--vp-font-family-mono);
+  color: var(--vp-c-text-3);
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pg-chip:hover { color: var(--vp-c-text-1); border-color: var(--vp-c-brand-1); }
+.pg-chip.on {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  border-color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+.pg-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
-  color: var(--vp-c-text-2);
+  flex: 1 1 190px;
   min-width: 0;
+  font-size: 12px;
+  color: var(--vp-c-text-2);
 }
-.pg-row input,
-.pg-row select,
-.pg-file {
+.pg-field-narrow { flex: 0 1 110px; }
+.pg-field input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
   padding: 6px 8px;
   font-size: 13px;
-  font-family: inherit;
+  font-family: var(--vp-font-family-mono);
   color: var(--vp-c-text-1);
   background: var(--vp-c-bg);
   border: 1px solid var(--vp-c-divider);
   border-radius: 6px;
 }
-.pg-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--vp-c-text-1);
-  cursor: pointer;
-}
-.pg-check input { margin-top: 2px; flex: none; }
-.pg-check code,
-.pg-row code { font-size: 12px; }
-.pg-hint {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--vp-c-text-3);
-}
-.pg-btn {
-  padding: 7px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--vp-c-white);
-  background: var(--vp-c-brand-1);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.pg-btn-ghost {
-  color: var(--vp-c-text-2);
-  background: transparent;
-  border-color: var(--vp-c-divider);
-}
+.pg-field input:disabled { opacity: 0.5; }
 
-/* Output --------------------------------------------------------------------*/
-.pg-output {
-  min-width: 0;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--vp-c-bg);
-}
-.pg-dragging { border-color: var(--vp-c-brand-1); }
+/* Panes ---------------------------------------------------------------------*/
 .pg-tabs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--vp-c-divider);
-  background: var(--vp-c-bg-soft);
 }
 .pg-tabs button {
-  padding: 5px 10px;
+  padding: 5px 11px;
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   color: var(--vp-c-text-2);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 7px;
   cursor: pointer;
 }
 .pg-tabs button.on {
   color: var(--vp-c-brand-1);
-  background: var(--vp-c-bg);
-  border-color: var(--vp-c-divider);
+  background: var(--vp-c-brand-soft);
 }
 .pg-badge {
   display: inline-block;
   margin-left: 5px;
-  padding: 0 5px;
+  padding: 0 6px;
   font-size: 11px;
   color: var(--vp-c-white);
   background: var(--vp-c-warning-3, #d97706);
-  border-radius: 8px;
+  border-radius: 9px;
+}
+.pg-badge-soft {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
 }
 .pg-status {
   margin-left: auto;
@@ -472,30 +539,38 @@ watch(renderOptions, render, { deep: true });
   font-size: 12px;
   color: var(--vp-c-text-3);
 }
-.pg-pane { padding: 14px 16px; }
+
+.pg-pane { padding: 16px 18px; }
 .pg-error {
   margin: 0;
-  padding: 10px 16px;
+  padding: 10px 18px;
   font-size: 13px;
   color: var(--vp-c-danger-1);
   background: var(--vp-c-danger-soft);
 }
-.pg-drop-hint {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--vp-c-text-3);
-}
 .pg-render {
-  max-height: 70vh;
+  max-height: 78vh;
   overflow: auto;
   /* The library ships its own stylesheet scoped to .reqif-preview; this only
      keeps a long document from taking over the page. */
 }
+.pg-drop-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+.pg-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vp-c-text-3);
+}
 .pg-code {
   margin: 0;
-  padding: 12px;
+  padding: 14px;
   overflow-x: auto;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
   background: var(--vp-c-bg-alt);
   border-radius: 8px;
@@ -504,6 +579,7 @@ watch(renderOptions, render, { deep: true });
   float: right;
   padding: 4px 9px;
   font-size: 12px;
+  font-family: inherit;
   color: var(--vp-c-text-2);
   background: var(--vp-c-bg-soft);
   border: 1px solid var(--vp-c-divider);
@@ -518,11 +594,16 @@ watch(renderOptions, render, { deep: true });
 }
 .pg-diag th,
 .pg-diag td {
-  padding: 6px 8px;
+  padding: 7px 10px;
   text-align: left;
   border-bottom: 1px solid var(--vp-c-divider);
   vertical-align: top;
 }
 .pg-diag th { font-size: 12px; color: var(--vp-c-text-2); }
 .pg-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .pg-sep { display: none; }
+  .pg-spacer { flex-basis: 100%; }
+}
 </style>

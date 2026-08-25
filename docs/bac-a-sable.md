@@ -1,3 +1,12 @@
+---
+# The preview needs the full content width: VitePress caps `.content-container`
+# at 688px only when the right-hand aside is present, so dropping the aside is
+# what actually widens the page — no CSS override, nothing tied to VitePress's
+# scoped-style hashes.
+aside: false
+pageClass: sandbox-page
+---
+
 # Bac à sable
 
 Cette page exécute **la vraie bibliothèque**, dans votre navigateur, sur le fichier
