@@ -1,0 +1,42 @@
+/**
+ * The sandbox injects HTML produced by the library, styled by the library's own
+ * stylesheet, into the middle of a `.vp-doc` article. VitePress styles bare
+ * elements (`.vp-doc table`, `.vp-doc h2`, `.vp-doc summary`) with one class
+ * plus one element — enough specificity to beat the library's single-class
+ * rules and, worse, to set properties the library never mentions.
+ *
+ * The most damaging of those is `.vp-doc table { display: block }`: it turns
+ * every rich-text table in a requirement into a stack of blockified cells. This
+ * block neutralises only what VitePress *adds*; it deliberately restates none
+ * of the library's own values, which would be one more thing to keep in sync.
+ */
+
+/* Real tables, not a column of blockified cells. */
+.vp-doc .reqif-preview table {
+  display: table;
+}
+
+/* No article-level heading chrome on a Specification title inside a card. */
+.vp-doc .reqif-preview h2 {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* `<summary>` here is a node title inside a bordered card, not a paragraph. */
+.vp-doc .reqif-preview summary {
+  margin: 0;
+}
+
+/* Tabs are links by design (the URL fragment picks the panel); they should not
+   look like prose links. Colour is left alone so the active-tab rule emitted by
+   tabs.ts still wins. */
+.vp-doc .reqif-preview .reqif-tab-headers a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Long rich text inside a requirement should wrap, not widen the page. */
+.vp-doc .reqif-preview {
+  overflow-wrap: anywhere;
+}

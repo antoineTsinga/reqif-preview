@@ -1,0 +1,45 @@
+/**
+ * Copies the freshly built bundle and regenerates the sample package into
+ * `docs/public/`, so the documentation site always demonstrates the code that
+ * is in the tree right now.
+ *
+ * The previous documentation page inlined a hand-pasted copy of the bundle. It
+ * was never regenerated, and within two months it was showing the behaviour of
+ * a version that no longer existed. Both outputs here are gitignored: they are
+ * build artefacts, produced by `npm run docs:build`, never edited by hand.
+ *
+ *   npm run build && node scripts/sync-docs-assets.mjs
+ */
+import { copyFile, mkdir, stat } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const run = promisify(execFile);
+
+const BUNDLE_SRC = "dist/index.js";
+const PUBLIC_DIR = "docs/public";
+const BUNDLE_DEST = `${PUBLIC_DIR}/reqif-preview.js`;
+const SAMPLE_DEST = `${PUBLIC_DIR}/exemple.reqifz`;
+
+const kb = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;
+
+await mkdir(PUBLIC_DIR, { recursive: true });
+
+try {
+  await stat(BUNDLE_SRC);
+} catch {
+  console.error(
+    `${BUNDLE_SRC} est absent. Lancez \`npm run build\` avant \`sync-docs-assets\`` +
+      ` (les scripts docs:* le font pour vous).`,
+  );
+  process.exit(1);
+}
+
+await copyFile(BUNDLE_SRC, BUNDLE_DEST);
+console.log(`bundle   : ${BUNDLE_DEST} (${kb((await stat(BUNDLE_DEST)).size)})`);
+
+// The sandbox needs a package that actually exercises what the site claims:
+// three cross-referencing documents, one attachment, one dangling relation and
+// one object rendered twice.
+await run(process.execPath, ["make-sample-package.mjs", SAMPLE_DEST]);
+console.log(`exemple  : ${SAMPLE_DEST} (${kb((await stat(SAMPLE_DEST)).size)})`);
