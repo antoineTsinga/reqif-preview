@@ -62,6 +62,64 @@ Conséquences directes de ce que l'état vit désormais dans l'URL de la page h�
 - **deux aperçus sur une même page** ne peuvent plus retenir deux sélections d'onglet
   indépendantes — un seul fragment, un seul état.
 
+### Un routeur SPA qui intercepte les liens casse les onglets
+
+C'est le piège d'intégration le plus probable, et il est silencieux : l'URL change
+correctement, mais **l'onglet ne bascule pas**.
+
+La plupart des frameworks de documentation et des SPA posent un écouteur de clic global
+qui intercepte les liens internes pour éviter un rechargement de page. Ils font alors :
+
+```js
+e.preventDefault();
+history.pushState({}, "", href);
+```
+
+Or `history.pushState` **ne recalcule pas l'élément ciblé par `:target`**. Le fragment de
+l'URL change, la page défile parfois, mais du point de vue du CSS aucun élément n'est
+`:target` — donc le panneau reste `display: none`.
+
+Rien dans le HTML produit n'est en cause : le même balisage fonctionne parfaitement dans
+une page statique. C'est l'interception du clic qui supprime la navigation par fragment
+dont le mécanisme dépend.
+
+**Le remède : faire en sorte que le routeur ignore ces liens.** La plupart des
+intercepteurs prévoient une sortie. Quelques exemples :
+
+| Hôte | Sortie |
+|---|---|
+| VitePress | un ancêtre portant la classe `vp-raw` — c'est ce que fait le [bac à sable](/bac-a-sable) |
+| Docusaurus, VitePress | un attribut `target` (même `target="_self"`, sans effet pour le navigateur) ou `download` |
+| Vue Router, React Router | rien à faire : seuls leurs composants `<RouterLink>`/`<Link>` sont concernés, pas les `<a>` bruts |
+
+Si votre routeur n'offre aucune sortie, la solution de dernier recours est de rétablir
+vous-même une vraie navigation par fragment après coup :
+
+```js
+container.addEventListener("click", (event) => {
+  const link = event.target.closest?.("a[href^='#']");
+  if (!link || !container.contains(link)) return;
+  const id = link.getAttribute("href").slice(1);
+  // Le routeur a peut-être fait un pushState, qui laisse :target inchangé.
+  // On rejoue une vraie navigation par fragment.
+  requestAnimationFrame(() => {
+    if (location.hash.slice(1) === id) location.hash = "";
+    location.hash = id;
+  });
+});
+```
+
+::: tip Comment reconnaître ce cas en trente secondes
+Ouvrez la console et comparez, après un clic sur un onglet :
+
+```js
+location.hash;                        // "#reqif-doc-..."  -> l'URL a bien changé
+document.querySelector(":target");    // null              -> mais rien n'est ciblé
+```
+
+`hash` renseigné et `:target` à `null`, c'est exactement cette situation.
+:::
+
 Cliquer un onglet fait par ailleurs défiler vers son panneau : c'est le comportement d'un
 lien, atténué par `scroll-margin-top` mais pas supprimable. Enfin, ce mécanisme repose sur
 `:has()`, disponible dans tous les navigateurs depuis décembre 2023.

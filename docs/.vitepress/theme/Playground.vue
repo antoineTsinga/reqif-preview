@@ -323,7 +323,15 @@ watch(renderOptions, render, { deep: true });
       <div v-show="rightTab === 'apercu'">
         <!-- The library's output is HTML it generated itself, from content it
              sanitized itself — that is exactly what this pane exists to show. -->
-        <div class="pg-render" v-html="html" />
+        <!-- `vp-raw` is VitePress's documented opt-out from its own router.
+             Its global click handler bails on `link.closest('.vp-raw')`;
+             without that it calls preventDefault() and history.pushState() for
+             every in-page anchor — and pushState does NOT recompute `:target`,
+             so the URL changed while the tab stayed shut. Measured: clicking
+             the second tab moved the hash but left display:none on its panel.
+             See guide/mise-en-page.md — this bites any SPA host, not just this
+             page. -->
+        <div class="pg-render vp-raw" v-html="html" />
         <p class="pg-drop-hint">
           Déposez un <code>.reqif</code> ou un <code>.reqifz</code> n'importe où sur ce
           bloc pour le remplacer.

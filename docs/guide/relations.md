@@ -73,6 +73,13 @@ rendus.
 Ils dérivent tous de l'identifiant ReqIF, jamais d'un compteur de position : un lien
 partagé survit à l'insertion d'un élément avant sa cible.
 
+::: warning Un routeur SPA peut neutraliser ces liens
+Les liens de relation sont de simples `<a href="#…">`, comme les onglets. Un framework qui
+intercepte les clics internes et fait `history.pushState` laisse `:target` inchangé : le
+lien ne rouvrira pas l'onglet contenant sa cible. Le mécanisme et les remèdes sont détaillés
+dans [Onglets, numérotation, lecture](/guide/mise-en-page#un-routeur-spa-qui-intercepte-les-liens-casse-les-onglets).
+:::
+
 ## Limite actuelle
 
 Seules les `SpecRelation` — liens objet-à-objet — sont affichées. Les `RelationGroup`,
