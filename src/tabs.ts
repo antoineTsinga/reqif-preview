@@ -29,13 +29,12 @@ function escapeAttr(s: string): string {
  * still `display:none`. With `:target`, the panel containing the anchor's
  * target opens on its own, at every nesting level at once.
  *
- * The trade-off is deliberate and documented: tab state now lives in the URL
- * fragment, so a host application that routes on the hash will see its route
- * change, and two previews on one page can no longer hold independent tab
- * selections. In exchange, `…#reqif-obj-SYS-REQ-0042` reopens the right
+ * The trade-off is deliberate: tab state lives in the URL fragment, so a host
+ * application that routes on the hash will see its route change, and two
+ * previews on one page cannot hold independent tab selections. In exchange, `…#reqif-obj-SYS-REQ-0042` reopens the right
  * document, the right specification, scrolled to the requirement.
  *
- * Only the active-tab highlight needs per-tab rules now; showing the panel is
+ * Only the active-tab highlight needs per-tab rules; showing the panel is
  * handled by three static rules that do not depend on how many tabs there are.
  */
 export function renderTabs(items: TabItem[]): string {

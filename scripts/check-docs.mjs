@@ -2,10 +2,9 @@
  * Fails the docs build if a symbol exported by `src/index.ts` is documented
  * nowhere under `docs/api/`.
  *
- * Same reasoning as `check-bundle.mjs`: the only thing that reliably keeps
- * documentation from drifting is a check that breaks the build. A README
- * paragraph asking future maintainers to "remember to document new exports"
- * has already failed twice in this repo.
+ * The only thing that reliably keeps documentation from drifting is a check
+ * that breaks the build. A README paragraph asking future maintainers to
+ * "remember to document new exports" is not a control; this is.
  *
  * The export list is read through the TypeScript compiler rather than with a
  * regex, so `export * from "./types.js"` is expanded exactly the way a consumer

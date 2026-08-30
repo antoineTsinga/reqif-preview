@@ -420,7 +420,7 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     expect(html).toContain('<span class="puid-badge">SRS-42</span>');
     expect(html).not.toContain("&lt;span");
   });
-  it("escapes a real-world unclosed <table> (the actual bug reported)", async () => {
+  it("escapes a real-world unclosed <table>", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,

@@ -3,10 +3,9 @@
  * `docs/public/`, so the documentation site always demonstrates the code that
  * is in the tree right now.
  *
- * The previous documentation page inlined a hand-pasted copy of the bundle. It
- * was never regenerated, and within two months it was showing the behaviour of
- * a version that no longer existed. Both outputs here are gitignored: they are
- * build artefacts, produced by `npm run docs:build`, never edited by hand.
+ * Both outputs are gitignored build artefacts, produced by `npm run docs:build`
+ * and never edited by hand: a copy pasted into the site by hand would show the
+ * behaviour of whatever version it was taken from.
  *
  *   npm run build && node scripts/sync-docs-assets.mjs
  */

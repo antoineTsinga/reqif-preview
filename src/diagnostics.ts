@@ -5,7 +5,7 @@
  * nothing throws, a surprising input degrades locally and the rest of the
  * document still renders. That is the right behaviour in production and a
  * miserable one in support — faced with "some things are missing from my
- * preview", there was previously no way to obtain a report. Handing a
+ * preview", there is nothing to inspect. Handing an
  * `onDegradation` handler to the renderer turns every one of those decisions
  * into an event you can log, count or assert on.
  *

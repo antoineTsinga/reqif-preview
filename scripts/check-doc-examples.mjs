@@ -2,12 +2,10 @@
  * Fails the docs build if a code example uses a variable that comes from
  * nowhere.
  *
- * The problem this catches: a reader landing on `docs/guide/relations.md` from
- * a search engine read `renderPackageToHtml(pkg, …)` with nothing on the page
- * saying what `pkg` was. Across the docs, `pkg` appeared in 22 blocks and was
- * defined in exactly one. Prose asking future maintainers to "introduce your
- * variables" has already failed twice in this repo, so this is a check that
- * breaks the build instead.
+ * The problem this catches: a reader landing on a page from a search engine
+ * meets `renderPackageToHtml(pkg, …)` with nothing on that page saying what
+ * `pkg` is. Prose asking future maintainers to "introduce your variables" is
+ * not a control; a check that breaks the build is.
  *
  * It type-checks each example and reports ONLY "Cannot find name 'X'"
  * (TS2304/TS2552). That narrowness is deliberate: a documentation snippet

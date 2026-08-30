@@ -4,10 +4,9 @@
  * output for `docs/public/exemple.reqifz`, rendered at build time by
  * scripts/sync-docs-assets.mjs and inlined here.
  *
- * Why not a PNG: a committed screenshot is the exact failure this site was
- * built to end — the page it replaced went two months stale without anyone
- * noticing. Why not render it live like the sandbox does: that would pull the
- * 216 Ko bundle onto the landing page just to draw a picture. Generating the
+ * Why not a PNG: a committed screenshot shows whatever the library did on the
+ * day it was taken. Why not render it live like the sandbox does: that would
+ * pull the 216 Ko bundle onto the landing page just to draw a picture. Generating the
  * HTML on Node costs the visitor nothing, needs no headless browser in CI, and
  * cannot drift.
  *

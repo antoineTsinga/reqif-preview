@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /**
- * Interactive sandbox: loads the *real* built bundle from /public and runs it
- * in the reader's browser. Nothing here is a screenshot or a transcription —
- * whatever the library does today is what this page shows.
+ * Interactive sandbox: loads the built bundle from /public and runs it in the
+ * reader's browser, so whatever the library does today is what this page shows.
  *
  * The bundle and the sample package are copied into docs/public by
  * scripts/sync-docs-assets.mjs at build time, so they can never lag behind
- * src/. That is the whole point: the page this replaces was a hand-pasted
- * copy that silently went two months stale.
+ * src/.
  *
  * Layout note: the controls sit in a toolbar ABOVE the output, not in a side
  * column. A ReqIF preview is a wide, deeply indented tree — every pixel taken

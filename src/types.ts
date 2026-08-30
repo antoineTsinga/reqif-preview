@@ -27,7 +27,7 @@ export type Identifier = string;
  * Note that clause 2 (Conformance) allows a tool to use AlternativeID as a
  * *parallel identification mechanism*. ReqIfIndex keys off the primary
  * `identifier` only, so a document whose *-REFs point at alternative ids
- * would not resolve. No such export has been observed so far.
+ * would not resolve.
  */
 export interface AlternativeId {
   identifier: Identifier;
