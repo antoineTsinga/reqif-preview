@@ -37,31 +37,10 @@ features:
       résout en O(1).
     link: /guide/rendu-maison
     linkText: Modèle de données
-  - title: Rien ne casse après le parsing
-    details: >-
-      Une entrée surprenante dégrade localement, le reste du document se rend
-      quand même. onDegradation rend visibles ces quatorze décisions silencieuses
-      quand vous en avez besoin.
-    link: /guide/diagnostics
-    linkText: Diagnostics
-  - title: Contenu tiers traité comme tel
-    details: >-
-      Liste blanche stricte de balises et d'attributs, alignée sur les modules
-      XHTML autorisés par la spec. Scripts, iframes et schémas d'URL exécutables
-      sont neutralisés.
-    link: /guide/securite
-    linkText: Sécurité
-  - title: Plusieurs documents, un lien qui marche
-    details: >-
-      Onglets en CSS pur, sans JavaScript. Le fragment d'URL décide du panneau
-      affiché — un lien vers une exigence rouvre le bon document, la bonne
-      spécification, défilé jusqu'à elle.
-    link: /guide/mise-en-page
-    linkText: Onglets et numérotation
   - title: Conforme à OMG ReqIF v1.2
     details: >-
-      formal/2016-07-01. Y compris les recoins : theOriginalValue, AlternativeID,
-      relations GLOBAL-REF entre documents d'un même paquet, EDITABLE-ATTS.
+      formal/2016-07-01. Le modèle de données suit la spec de près, cas limites
+      compris, plutôt qu'un sous-ensemble commode.
     link: /api/modele
     linkText: Modèle
 ---

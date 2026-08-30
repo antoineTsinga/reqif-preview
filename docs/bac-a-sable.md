@@ -11,8 +11,7 @@ pageClass: sandbox-page
 
 Cette page exécute **la vraie bibliothèque**, dans votre navigateur, sur le fichier
 de votre choix. Le bundle chargé ici est celui produit par `npm run build` au moment
-de la publication du site : ce que vous voyez est ce que fait le code aujourd'hui,
-pas une capture d'écran ni une transcription.
+de la publication du site : ce que vous voyez est ce que fait le code aujourd'hui.
 
 Rien n'est envoyé nulle part — il n'y a aucun serveur derrière cette page. Votre
 fichier est lu par `FileReader` et traité localement.

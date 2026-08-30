@@ -57,7 +57,7 @@ l'insertion d'un document avant lui.
 
 ### Deux contreparties assumées
 
-Conséquences directes de ce que l'état vit désormais dans l'URL de la page hôte :
+Conséquences directes du fait que l'état vit dans l'URL de la page hôte :
 
 - une application hôte qui **route sur le hash** (Vue Router en mode hash, par exemple)
   verra sa route changer à chaque clic d'onglet ;

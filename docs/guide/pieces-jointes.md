@@ -82,7 +82,7 @@ import { createAttachmentLookup, renderSpecification, ReqIfIndex } from "reqif-p
 const index = new ReqIfIndex(pkg.documents);
 const lookup = await createAttachmentLookup(pkg.document, pkg.attachments);
 
-// désormais synchrone, appelable dans un rendu virtualisé
+// synchrone, appelable dans un rendu virtualisé
 const html = renderSpecification(spec, index, lookup);
 ```
 

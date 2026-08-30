@@ -33,8 +33,7 @@ import { withBase } from "vitepress";
       <div class="hp-fade" aria-hidden="true" />
     </div>
     <figcaption>
-      Rendu réel, produit par la bibliothèque au moment de la publication de ce site —
-      ni capture d'écran, ni maquette.
+      Rendu produit par la bibliothèque à partir du fichier d'exemple.
       <a :href="withBase('/bac-a-sable')">Essayez sur votre propre fichier</a>.
     </figcaption>
   </figure>

@@ -22,7 +22,4 @@ const spec = doc.coreContent.specifications[0];
 const obj = index.specObjects.get(spec.children[0].objectRef)!;
 ```
 
-Ce bloc est vérifié au build, comme tous les exemples du site : `scripts/check-doc-examples.mjs`
-le compile et refuse toute variable dont on ne connaît pas la provenance.
-
 :::
