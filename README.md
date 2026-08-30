@@ -17,6 +17,11 @@ npm install reqif-preview
 ```ts
 import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
 
+// Les octets de votre fichier. Depuis une URL :
+const fileBytes = new Uint8Array(await (await fetch("/exigences.reqifz")).arrayBuffer());
+// Depuis un <input type="file">  : new Uint8Array(await file.arrayBuffer())
+// Depuis Node                    : await readFile("exigences.reqifz")
+
 // input : string XML brut, Uint8Array, ou ArrayBuffer (auto-détecte .reqif vs .reqifz)
 const pkg = await loadReqIfPackage(fileBytes);
 

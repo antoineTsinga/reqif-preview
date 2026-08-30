@@ -1,5 +1,7 @@
 # Texte simplifié en cours de route (`isSimplified`)
 
+<!--@include: ../_conventions.md-->
+
 Quand un outil de la chaîne d'échange ne sait pas interpréter la mise en forme d'un
 attribut XHTML, la spec (clause 10.8.20) lui demande de :
 
@@ -27,9 +29,13 @@ const html = await renderPackageToHtml(pkg, { preferSimplifiedXhtml: true });
 Les deux contenus sont exposés dans le modèle :
 
 ```ts
-value.value;          // XhtmlContent — ce que la spec appelle theValue
-value.originalValue;  // XhtmlContent — theOriginalValue, si présent
-value.isSimplified;   // true quand value.value est un substitut dégradé
+const { value } = resolveAttribute(obj, index, "ReqIF.Text");
+
+if (value?.kind === "XHTML") {
+  value.value;         // XhtmlContent — ce que la spec appelle theValue
+  value.originalValue; // XhtmlContent — theOriginalValue, si présent
+  value.isSimplified;  // true quand value.value est un substitut dégradé
+}
 ```
 
 Les pièces jointes référencées par l'un comme par l'autre sont résolues : basculer

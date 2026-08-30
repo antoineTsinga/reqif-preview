@@ -1,5 +1,7 @@
 # Choisir précisément le titre et le contenu affichés
 
+<!--@include: ../_conventions.md-->
+
 Par défaut, le **titre** vient du `LONG-NAME` de l'objet (ou de son nœud dans
 l'arborescence), et le **contenu** affiche automatiquement tous les attributs XHTML de
 l'objet — ce qui n'est pas toujours pertinent si plusieurs champs riches coexistent sans

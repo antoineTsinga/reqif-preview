@@ -1,5 +1,7 @@
 # Afficher un contenu personnalisé
 
+<!--@include: ../_conventions.md-->
+
 `ReqIF.ForeignID` couvre le cas standard, mais beaucoup d'outils stockent leur
 identifiant métier dans un attribut au nom libre — par exemple `IE PUID` chez DOORS,
 parfois en XHTML plutôt qu'en chaîne simple. Pour ces cas, enregistrez un **rendu

@@ -25,7 +25,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:dev": "npm run build && node scripts/sync-docs-assets.mjs && vitepress dev docs",
-    "docs:build": "npm run build && node scripts/sync-docs-assets.mjs && node scripts/check-docs.mjs && vitepress build docs",
+    "docs:build": "npm run build && node scripts/sync-docs-assets.mjs && node scripts/check-docs.mjs && node scripts/check-doc-examples.mjs && vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },
   "keywords": [

@@ -1,5 +1,7 @@
 # Diagnostiquer ce qui a été dégradé (`onDegradation`)
 
+<!--@include: ../_conventions.md-->
+
 Passé l'étape de parsing, **rien ne lève**. Une entrée surprenante dégrade localement et le
 reste du document se rend quand même. C'est le bon comportement en production — un aperçu
 d'exigences vaut mieux qu'une page blanche — et c'est pénible en support : face à « il

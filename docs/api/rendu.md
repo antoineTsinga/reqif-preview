@@ -1,5 +1,7 @@
 # Rendu HTML
 
+<!--@include: ../_conventions.md-->
+
 Quatre fonctions, de la plus haut niveau à la plus fine. Toutes produisent du HTML destiné
 à `innerHTML`, jamais un document complet.
 
@@ -53,10 +55,10 @@ un objet d'un autre `.reqif` du paquet devient `unresolved-reference`. Sans `emi
 partagé, deux documents rendus séparément peuvent émettre le même `id` d'ancrage.
 
 ```ts
-const index = new ReqIfIndex(pkg.documents);
+const options: RenderOptions = { layout: "tabs" };
 const emitted = new Set<string>();
 const parts = await Promise.all(
-  pkg.documents.map((d) => renderDocumentToHtml(d, pkg.attachments, opts, index, emitted)),
+  pkg.documents.map((d) => renderDocumentToHtml(d, pkg.attachments, options, index, emitted)),
 );
 ```
 
@@ -137,6 +139,9 @@ C'est la brique à utiliser si vous construisez votre propre rendu et voulez jus
 le corps d'une exigence sans reprendre toute la mise en page.
 
 ```ts
+const lookup = await createAttachmentLookup(doc, pkg.attachments);
+const el = document.getElementById("corps-de-l-exigence")!;
+
 const { value } = resolveAttribute(obj, index, "ReqIF.Text");
 if (value?.kind === "XHTML" && value.value) {
   el.innerHTML = renderXhtmlContent(value.value, { attachments: lookup });

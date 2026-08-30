@@ -1,5 +1,7 @@
 # Chargement et parsing
 
+<!--@include: ../_conventions.md-->
+
 ## `loadReqIfPackage`
 
 ```ts
@@ -15,7 +17,7 @@ Le point d'entrée normal. Détecte seul la nature de l'entrée :
 - des **octets** quelconques sont décodés en UTF-8 et traités comme du XML.
 
 ```ts
-const pkg = await loadReqIfPackage(new Uint8Array(await file.arrayBuffer()));
+const pkg = await loadReqIfPackage(bytes);
 pkg.documents;   // ReqIfDocument[] — un .reqifz peut légalement en contenir plusieurs
 pkg.document;    // le premier, accesseur de confort pour le cas mono-document
 pkg.attachments; // AttachmentResolver (EMPTY_ATTACHMENTS pour un .reqif nu)

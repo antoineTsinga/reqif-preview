@@ -1,5 +1,7 @@
 # Documents très imbriqués
 
+<!--@include: ../_conventions.md-->
+
 Deux garde-fous de `fast-xml-parser` — l'analyseur XML utilisé en interne — font échouer
 le parsing de documents ReqIF parfaitement valides avec leurs valeurs par défaut.
 `reqif-preview` les relève ; cette page explique pourquoi, et comment les ajuster.

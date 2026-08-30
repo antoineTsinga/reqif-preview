@@ -1,5 +1,7 @@
 # Référence API — vue d'ensemble
 
+<!--@include: ../_conventions.md-->
+
 Tout est exporté depuis la racine du paquet :
 
 ```ts

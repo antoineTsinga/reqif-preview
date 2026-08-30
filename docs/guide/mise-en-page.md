@@ -1,5 +1,7 @@
 # Onglets, numérotation, vue de lecture
 
+<!--@include: ../_conventions.md-->
+
 Trois options composables, pensées pour les gros exports (`.reqifz` à plusieurs modules)
 et pour produire un rendu plus proche d'un document Word :
 
@@ -70,6 +72,8 @@ correctement, mais **l'onglet ne bascule pas**.
 La plupart des frameworks de documentation et des SPA posent un écouteur de clic global
 qui intercepte les liens internes pour éviter un rechargement de page. Ils font alors :
 
+<!-- exemple: extrait — cite le gestionnaire interne de VitePress, ce n'est pas notre code -->
+
 ```js
 e.preventDefault();
 history.pushState({}, "", href);
@@ -96,6 +100,9 @@ Si votre routeur n'offre aucune sortie, la solution de dernier recours est de r�
 vous-même une vraie navigation par fragment après coup :
 
 ```js
+// L'élément qui reçoit le HTML de l'aperçu.
+const container = document.getElementById("preview")!;
+
 container.addEventListener("click", (event) => {
   const link = event.target.closest?.("a[href^='#']");
   if (!link || !container.contains(link)) return;

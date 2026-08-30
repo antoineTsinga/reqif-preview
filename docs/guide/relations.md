@@ -1,5 +1,7 @@
 # Liens entre exigences (`SpecRelation`)
 
+<!--@include: ../_conventions.md-->
+
 Les liens typés entre exigences — « dérive de », « satisfait », « trace vers » — sont
 affichés automatiquement pour chaque objet qui en possède : ses liens **sortants** (`→`)
 et **entrants** (`←`), avec le nom du type de relation et un lien d'ancrage vers l'objet
@@ -38,6 +40,7 @@ lui-même, et les relations qui traversent la frontière ne résolvent plus. Pas
 propre index partagé en 4ᵉ argument pour retrouver le même comportement :
 
 ```ts
+const options: RenderOptions = { layout: "tabs" };
 const index = new ReqIfIndex(pkg.documents); // et non pkg.document
 const html = await renderDocumentToHtml(doc, pkg.attachments, options, index);
 ```

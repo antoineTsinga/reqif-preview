@@ -1,5 +1,7 @@
 # Pièces jointes (`.reqifz`)
 
+<!--@include: ../_conventions.md-->
+
 Un `.reqifz` est une archive zip contenant un ou plusieurs `.reqif` **et** les fichiers
 binaires qu'ils référencent : images, PDF, tout ce que le texte enrichi cite via
 `<object data="...">`.
@@ -43,6 +45,7 @@ const attachments = createAttachmentResolver((path) => {
   return bytes ? { bytes } : undefined;
 });
 
+const xmlString = await (await fetch("/exigences.reqif")).text();
 const pkg = await loadReqIfPackage(xmlString);
 const html = await renderPackageToHtml(pkg, { attachments });
 ```

@@ -1,5 +1,7 @@
 # Options de rendu
 
+<!--@include: ../_conventions.md-->
+
 ## `RenderOptions`
 
 Le même objet est accepté par `renderPackageToHtml`, `renderDocumentToHtml` et

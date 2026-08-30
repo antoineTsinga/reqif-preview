@@ -1,5 +1,7 @@
 # Votre propre rendu
 
+<!--@include: ../_conventions.md-->
+
 Vous n'êtes pas obligé d'utiliser le HTML fourni. `loadReqIfPackage` — et `parseReqIfXml`
 pour du XML déjà en mémoire — vous donnent un modèle de données **typé, acyclique et
 sérialisable** (`ReqIfDocument`) qui reflète fidèlement le modèle UML de la spec ReqIF :
@@ -19,6 +21,7 @@ une indirection à la lecture — c'est le rôle de `ReqIfIndex`.
 ```ts
 import { parseReqIfXml, ReqIfIndex } from "reqif-preview";
 
+const xmlString = await (await fetch("/exigences.reqif")).text();
 const doc = parseReqIfXml(xmlString);
 const index = new ReqIfIndex(doc);
 

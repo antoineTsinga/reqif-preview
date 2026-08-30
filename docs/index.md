@@ -71,6 +71,7 @@ features:
 ```ts
 import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
 
+const fileBytes = new Uint8Array(await (await fetch("/exigences.reqifz")).arrayBuffer());
 const pkg = await loadReqIfPackage(fileBytes); // .reqif ou .reqifz, auto-détecté
 document.getElementById("preview").innerHTML = await renderPackageToHtml(pkg);
 ```
