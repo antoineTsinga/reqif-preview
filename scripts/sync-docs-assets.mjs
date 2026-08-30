@@ -10,7 +10,7 @@
  *
  *   npm run build && node scripts/sync-docs-assets.mjs
  */
-import { copyFile, mkdir, stat } from "node:fs/promises";
+import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -20,6 +20,7 @@ const BUNDLE_SRC = "dist/index.js";
 const PUBLIC_DIR = "docs/public";
 const BUNDLE_DEST = `${PUBLIC_DIR}/reqif-preview.js`;
 const SAMPLE_DEST = `${PUBLIC_DIR}/exemple.reqifz`;
+const HERO_DEST = "docs/.vitepress/theme/hero-preview.generated.html";
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;
 
@@ -43,3 +44,17 @@ console.log(`bundle   : ${BUNDLE_DEST} (${kb((await stat(BUNDLE_DEST)).size)})`)
 // one object rendered twice.
 await run(process.execPath, ["make-sample-package.mjs", SAMPLE_DEST]);
 console.log(`exemple  : ${SAMPLE_DEST} (${kb((await stat(SAMPLE_DEST)).size)})`);
+
+// The landing page's illustration. Rendering it here rather than shipping a
+// screenshot means it cannot go stale, and — because the library runs on Node
+// and emits self-contained HTML with its own <style> — it costs the visitor
+// nothing: no headless browser at build time, no 216 Ko bundle downloaded on a
+// page that only wants to show what the output looks like.
+//
+// One document, not the whole package: a single document has no tabs, so the
+// illustration cannot hijack the landing page's URL fragment through :target.
+const lib = await import("../dist/index.js");
+const samplePkg = await lib.loadReqIfPackage(new Uint8Array(await readFile(SAMPLE_DEST)));
+const heroHtml = await lib.renderDocumentToHtml(samplePkg.document, samplePkg.attachments);
+await writeFile(HERO_DEST, heroHtml, "utf8");
+console.log(`aperçu   : ${HERO_DEST} (${kb(heroHtml.length)})`);

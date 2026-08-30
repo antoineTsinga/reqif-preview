@@ -1,6 +1,7 @@
 import DefaultTheme from "vitepress/theme";
 import type { Theme } from "vitepress";
 import Playground from "./Playground.vue";
+import HeroPreview from "./HeroPreview.vue";
 import "./custom.css";
 
 export default {
@@ -8,5 +9,6 @@ export default {
   enhanceApp({ app }) {
     // Usable from any markdown page as <Playground />.
     app.component("Playground", Playground);
+    app.component("HeroPreview", HeroPreview);
   },
 } satisfies Theme;

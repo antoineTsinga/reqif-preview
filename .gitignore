@@ -20,3 +20,4 @@ docs/public/reqif-preview.js
 docs/public/exemple.reqifz
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+docs/.vitepress/theme/hero-preview.generated.html

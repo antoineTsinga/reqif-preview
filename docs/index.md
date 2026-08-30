@@ -66,6 +66,8 @@ features:
     linkText: Modèle
 ---
 
+<HeroPreview />
+
 ## En trois lignes
 
 ```ts
