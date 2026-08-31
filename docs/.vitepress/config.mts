@@ -1,4 +1,9 @@
 import { defineConfig } from "vitepress";
+import { createRequire } from "node:module";
+
+// Read from package.json rather than typed out here: a version in two places
+// is a version that will disagree with itself on the next release.
+const { version } = createRequire(import.meta.url)("../../package.json");
 
 // Project page, not a user page: the site is served from
 // https://antoinetsinga.github.io/reqif-preview/ — without this base, every
@@ -35,7 +40,7 @@ export default defineConfig({
       { text: "Guide", link: "/guide/demarrage" },
       { text: "API", link: "/api/" },
       { text: "Bac à sable", link: "/bac-a-sable" },
-      { text: "v0.1.0", link: "https://github.com/antoineTsinga/reqif-preview/releases" },
+      { text: `v${version}`, link: "https://github.com/antoineTsinga/reqif-preview/releases" },
     ],
 
     sidebar: [
