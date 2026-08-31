@@ -13,25 +13,34 @@ on:
 
 permissions:
   contents: read
-  # Required for npm provenance: the OIDC token is what lets npm attest that
-  # this tarball was built by this workflow, from this commit.
+  # The whole authentication story. npm exchanges this OIDC token for a
+  # short-lived publish credential, so the repository holds no npm secret at
+  # all — nothing to leak, rotate, or forget to revoke.
   id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: npm
-      url: https://www.npmjs.com/package/reqif-preview
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          # Trusted publishing requires Node >= 22.14 and npm >= 11.5.1.
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          # No dependency cache in a release build: the tarball must come from
+          # a clean resolve, not from whatever a previous run left behind.
+
+      # Node 24 already ships npm 11, but which patch it ships changes over
+      # time. Pinning the floor here means a Node image update can never drop
+      # the runner below the version that understands OIDC — a failure that
+      # would otherwise appear as an opaque auth error.
+      - name: npm >= 11.5.1, required for OIDC
+        run: |
+          npm install -g npm@^11.5.1
+          npm --version
 
       - run: npm ci
 
@@ -39,7 +48,6 @@ jobs:
       # to republish a version, so a mismatch here would burn the number.
       - name: The tag must match package.json
         if: github.event_name == 'release'
-        shell: bash
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(node -p 'require("./package.json").version')"
@@ -50,7 +58,6 @@ jobs:
           echo "version $pkg"
 
       - name: Already on npm?
-        shell: bash
         run: |
           pkg="$(node -p 'require("./package.json").version')"
           if npm view "reqif-preview@$pkg" version >/dev/null 2>&1; then
@@ -61,14 +68,12 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-      # `npm publish` runs prepublishOnly, which builds and tests again. That is
-      # deliberate: the tarball must come from this checkout, never from a dist/
-      # someone had lying around.
+      # No NODE_AUTH_TOKEN: the OIDC exchange is what authenticates, and npm
+      # attaches a provenance attestation on its own — `--provenance` is
+      # implied by trusted publishing, not something to pass here.
+      #
+      # `npm publish` also runs prepublishOnly, which builds and tests again.
+      # That is deliberate: the tarball must come from this checkout, never
+      # from a dist/ someone had lying around.
       - name: Publish
         run: npm publish
-        env:
-          # Trusted Publishing (npm > Package settings > Trusted publisher)
-          # needs no secret and is the recommended path. If you set up a
-          # granular access token instead, add it as the NPM_TOKEN secret —
-          # this line then picks it up and nothing else changes.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

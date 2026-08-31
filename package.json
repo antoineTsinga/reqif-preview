@@ -40,8 +40,7 @@
     "node": ">=20"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "tsup && tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist && node scripts/emit-style.mjs",
