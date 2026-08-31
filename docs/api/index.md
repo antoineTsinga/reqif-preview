@@ -1,41 +1,41 @@
-# Référence API — vue d'ensemble
+# API reference — overview
 
 <!--@include: ../_conventions.md-->
 
-Tout est exporté depuis la racine du paquet :
+Everything is exported from the package root:
 
 ```ts
 import { loadReqIfPackage, renderPackageToHtml /* … */ } from "reqif-preview";
 ```
 
-## Les dix fonctions qui comptent
+## The ten functions that matter
 
 | Export | Description |
 |---|---|
-| [`loadReqIfPackage(input, options?)`](/api/chargement#loadreqifpackage) | Charge un `.reqif` (string/bytes) ou `.reqifz` (bytes), retourne un `ReqIfPackage`. |
-| [`parseReqIfXml(xml, options?)`](/api/chargement#parsereqifxml) | Parse une seule chaîne XML ReqIF en `ReqIfDocument`. |
-| [`ReqIfIndex`](/api/modele#reqifindex) | Index de résolution O(1) des références croisées d'un ou plusieurs documents. |
-| [`renderPackageToHtml(pkg, options?)`](/api/rendu#renderpackagetohtml) | Rendu HTML complet — tous les documents du paquet. |
-| [`renderDocumentToHtml(doc, attachments, options?, sharedIndex?)`](/api/rendu#renderdocumenttohtml) | Rendu HTML d'un seul document. |
-| [`renderSpecification(spec, index, attachments, labels?, options?)`](/api/rendu#renderspecification) | Rendu **synchrone** d'une seule arborescence — pour une UI virtualisée. |
-| [`createAttachmentLookup(doc, resolver, maxInlineBytes?, onDegradation?)`](/api/rendu#createattachmentlookup) | Pré-résout les pièces jointes en `data:` URI — nécessaire pour alimenter `renderSpecification`. |
-| [`renderXhtmlContent(content, options?)`](/api/rendu#renderxhtmlcontent) | Sérialisation assainie d'un fragment XHTML isolé. |
-| [`xhtmlToPlainText(content)`](/api/rendu#xhtmltoplaintext) | Extraction texte brut d'un fragment XHTML. |
-| [`createAttachmentResolver(fn)`](/api/chargement#createattachmentresolver) | Construit un résolveur de pièces jointes personnalisé. |
+| [`loadReqIfPackage(input, options?)`](/api/loading#loadreqifpackage) | Loads a `.reqif` (string/bytes) or `.reqifz` (bytes), returns a `ReqIfPackage`. |
+| [`parseReqIfXml(xml, options?)`](/api/loading#parsereqifxml) | Parses a single ReqIF XML string into a `ReqIfDocument`. |
+| [`ReqIfIndex`](/api/model#reqifindex) | O(1) resolution index for the cross-references of one or more documents. |
+| [`renderPackageToHtml(pkg, options?)`](/api/rendering#renderpackagetohtml) | Full HTML render — every document in the package. |
+| [`renderDocumentToHtml(doc, attachments, options?, sharedIndex?)`](/api/rendering#renderdocumenttohtml) | HTML render of a single document. |
+| [`renderSpecification(spec, index, attachments, labels?, options?)`](/api/rendering#renderspecification) | **Synchronous** render of a single tree — for a virtualised UI. |
+| [`createAttachmentLookup(doc, resolver, maxInlineBytes?, onDegradation?)`](/api/rendering#createattachmentlookup) | Pre-resolves attachments to `data:` URIs — required to feed `renderSpecification`. |
+| [`renderXhtmlContent(content, options?)`](/api/rendering#renderxhtmlcontent) | Sanitised serialisation of an isolated XHTML fragment. |
+| [`xhtmlToPlainText(content)`](/api/rendering#xhtmltoplaintext) | Plain-text extraction from an XHTML fragment. |
+| [`createAttachmentResolver(fn)`](/api/loading#createattachmentresolver) | Builds a custom attachment resolver. |
 
-## Où trouver quoi
+## Where to find what
 
-| Page | Contenu |
+| Page | Contents |
 |---|---|
-| [Chargement et parsing](/api/chargement) | `loadReqIfPackage`, `parseReqIfXml`, `ParseOptions`, `ReqIfParseError`, résolveurs de pièces jointes |
-| [Rendu HTML](/api/rendu) | Les quatre fonctions de rendu, `renderXhtmlContent`, `xhtmlToPlainText`, `escapeHtml` |
-| [Options de rendu](/api/options) | `RenderOptions` au complet, `RenderLabels`, les rendus personnalisés |
-| [Modèle de données](/api/modele) | Tous les types du modèle ReqIF, `ReqIfIndex` et les helpers de lecture |
+| [Loading and parsing](/api/loading) | `loadReqIfPackage`, `parseReqIfXml`, `ParseOptions`, `ReqIfParseError`, attachment resolvers |
+| [HTML rendering](/api/rendering) | The four rendering functions, `renderXhtmlContent`, `xhtmlToPlainText`, `escapeHtml` |
+| [Render options](/api/options) | The whole of `RenderOptions`, `RenderLabels`, custom renderers |
+| [Data model](/api/model) | Every type of the ReqIF model, `ReqIfIndex` and the reading helpers |
 | [Diagnostics](/api/diagnostics) | `DegradationCode`, `DegradationEvent`, `DegradationHandler` |
 
-## Ce qui peut lever
+## What can throw
 
-Une seule chose : le **parsing**.
+One thing only: **parsing**.
 
 ```ts
 import { ReqIfParseError } from "reqif-preview";
@@ -43,36 +43,36 @@ import { ReqIfParseError } from "reqif-preview";
 try {
   const pkg = await loadReqIfPackage(bytes);
 } catch (e) {
-  if (e instanceof ReqIfParseError) { /* XML invalide, zip corrompu, racine absente… */ }
+  if (e instanceof ReqIfParseError) { /* invalid XML, corrupt zip, missing root… */ }
 }
 ```
 
-Passé ce point, plus rien ne lève : les fonctions de rendu dégradent localement et
-poursuivent. Pour savoir *ce qui* a été dégradé, voir [Diagnostics](/api/diagnostics).
+Past that point nothing throws: the rendering functions degrade locally and carry on. To
+learn *what* was degraded, see [Diagnostics](/api/diagnostics).
 
-## Feuille de style
+## Stylesheet
 
-Le rendu embarque sa propre feuille de style dans un `<style>` en tête du HTML retourné,
-scopée sur `.reqif-preview`. Il n'y a donc rien à importer ni à lier : c'est ce qui rend la
-sortie autonome, insérable telle quelle avec `innerHTML`.
+The render embeds its own stylesheet in a `<style>` at the top of the returned HTML,
+scoped to `.reqif-preview`. There is therefore nothing to import or link: that is what
+makes the output self-contained, insertable as-is with `innerHTML`.
 
-Pour la fournir vous-même — cas d'une politique de sécurité de contenu (CSP) interdisant
-les `<style>` inline, ou d'un thème maison :
+To supply it yourself — a Content Security Policy forbidding inline `<style>`, or a theme
+of your own:
 
 ```ts
 const html = await renderPackageToHtml(pkg, { includeCss: false });
 ```
 
-La feuille reste alors accessible de deux façons, l'une et l'autre issues de la **même
-source**, donc jamais désynchronisées :
+The stylesheet then stays reachable two ways, both coming from the **same source**, so
+they can never disagree:
 
 ```ts
-// Un fichier, pour un <link> ou un import de bundler.
+// A file, for a <link> or a bundler import.
 import "reqif-preview/style.css";
 ```
 
 ```ts
-// Le texte, pour ce qu'un <link> n'atteint pas — un Shadow DOM, par exemple.
+// The text, for what a <link> cannot reach — a Shadow DOM, for instance.
 import { DEFAULT_CSS } from "reqif-preview";
 
 const shadowRoot = document.getElementById("preview")!.attachShadow({ mode: "open" });
@@ -82,12 +82,11 @@ sheet.replaceSync(DEFAULT_CSS);
 shadowRoot.adoptedStyleSheets = [sheet];
 ```
 
-Si vous écrivez vos propres règles à la place, sachez que les onglets **cessent de
-fonctionner sans elles** : leur mécanisme est entièrement porté par les règles `:target` de
-cette feuille.
+If you write your own rules instead, be aware that the tabs **stop working without
+these**: their mechanism rests entirely on this stylesheet's `:target` rules.
 
-::: warning La feuille suppose un fond clair
-`.reqif-preview` fixe une couleur de texte (`#1a1a1a`) mais aucun fond. Inséré tel quel dans
-une page au thème sombre, l'aperçu serait illisible : c'est à l'hôte de fournir une surface
-claire.
+::: warning The stylesheet assumes a light surface
+`.reqif-preview` sets a text colour (`#1a1a1a`) but no background. Dropped as-is into a
+dark-themed page, the preview would be unreadable: it is up to the host to provide a light
+surface.
 :::

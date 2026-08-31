@@ -92,7 +92,7 @@ intercepteurs prévoient une sortie. Quelques exemples :
 
 | Hôte | Sortie |
 |---|---|
-| VitePress | un ancêtre portant la classe `vp-raw` — c'est ce que fait le [bac à sable](/bac-a-sable) |
+| VitePress | un ancêtre portant la classe `vp-raw` — c'est ce que fait le [bac à sable](/fr/bac-a-sable) |
 | Docusaurus, VitePress | un attribut `target` (même `target="_self"`, sans effet pour le navigateur) ou `download` |
 | Vue Router, React Router | rien à faire : seuls leurs composants `<RouterLink>`/`<Link>` sont concernés, pas les `<a>` bruts |
 
@@ -165,10 +165,10 @@ visibles.
   disparaissent. Le contenu reste accessible en repassant en mode normal.
 - Les titres passent de simples lignes en gras à de vraies balises `<h3>`…`<h6>` selon la
   profondeur — la `Specification` elle-même garde son `<h2>`.
-- Le contenu que *vous* ajoutez via [`customAttributeRenderers`](/guide/rendus-personnalises)
+- Le contenu que *vous* ajoutez via [`customAttributeRenderers`](/fr/guide/rendus-personnalises)
   **reste affiché** : seule la métadonnée générée automatiquement est masquée, pas ce que
   vous avez explicitement demandé.
-- Les [liens entre exigences](/guide/relations) restent affichés eux aussi — un lien de
+- Les [liens entre exigences](/fr/guide/relations) restent affichés eux aussi — un lien de
   traçabilité est du contenu, pas de la métadonnée technique.
 
 ::: details Pourquoi les tailles de titres sont fixées explicitement
@@ -183,7 +183,7 @@ niveau par niveau de `1.3rem` à `0.95rem`. Passé `<h6>`, la taille reste const
 :::
 
 ::: tip
-Le [bac à sable](/bac-a-sable) expose ces trois options sur un paquet à trois documents et
+Le [bac à sable](/fr/bac-a-sable) expose ces trois options sur un paquet à trois documents et
 deux niveaux d'onglets. C'est le moyen le plus rapide de voir laquelle correspond à ce que
 vous cherchez.
 :::

@@ -1,7 +1,7 @@
 # Diagnostics
 
-Trois types, une option. Voir [le guide](/guide/diagnostics) pour l'usage et la lecture des
-symptômes.
+Three types, one option. See [the guide](/guide/diagnostics) for usage and for reading the
+symptoms.
 
 ## `DegradationHandler`
 
@@ -9,21 +9,21 @@ symptômes.
 type DegradationHandler = (event: DegradationEvent) => void;
 ```
 
-Passé via `RenderOptions.onDegradation` — accepté par `renderPackageToHtml`,
-`renderDocumentToHtml`, `renderSpecification`, `createAttachmentLookup` et
+Passed through `RenderOptions.onDegradation` — accepted by `renderPackageToHtml`,
+`renderDocumentToHtml`, `renderSpecification`, `createAttachmentLookup` and
 `renderXhtmlContent`.
 
-Une exception levée dans le gestionnaire est **interceptée et ignorée**. Un canal de
-diagnostic qui casse ce qu'il observe serait pire que pas de canal du tout.
+An exception thrown inside the handler is **caught and ignored**. A diagnostic channel
+that broke what it was observing would be worse than no channel at all.
 
 ## `DegradationEvent`
 
 ```ts
 interface DegradationEvent {
   code: DegradationCode;
-  /** Une phrase lisible, sûre à journaliser telle quelle. */
+  /** A readable sentence, safe to log as-is. */
   message: string;
-  /** Ce qui identifie l'endroit : un id, un chemin, un nom de balise, la valeur fautive. */
+  /** What identifies the place: an id, a path, a tag name, the offending value. */
   detail?: Record<string, unknown>;
 }
 ```
@@ -48,35 +48,34 @@ type DegradationCode =
   | "invalid-locale";
 ```
 
-| Code | Situation | Clés de `detail` |
+| Code | Situation | `detail` keys |
 |---|---|---|
-| `attachment-missing` | pièce jointe référencée qu'aucun résolveur ne trouve | `path` |
-| `attachment-too-large` | pièce jointe dépassant `maxInlineBytes`, laissée non résolue | `path`, `size`, `maxInlineBytes` |
-| `unresolved-reference` | `SpecRelation` visant un objet absent du rendu | `relation`, `sourceRef`, `targetRef` |
-| `orphan-attribute-value` | valeur dont l'`AttributeDefinition` est absente du `SpecType` déclaré | `specObject`, `definitionRef`, `specType` |
-| `missing-spec-object` | nœud d'arborescence pointant vers un `SpecObject` inexistant | `specHierarchy`, `objectRef` |
-| `duplicate-dom-id` | objet rendu plusieurs fois ; seule la première occurrence porte l'`id` | `specObject`, `id`, `specHierarchy` |
-| `custom-renderer-threw` | un `customAttributeRenderers` a levé et a été ignoré | `attribute`, `specObject`, `error` |
-| `custom-renderer-unbalanced-html` | HTML personnalisé mal fermé, échappé en texte | `attribute`, `specObject`, `html` |
-| `dropped-tag` | balise supprimée avec son sous-arbre (`<script>`, `<iframe>`…) | `tag` |
-| `unwrapped-tag` | balise hors liste blanche déballée, enfants conservés | `tag` |
-| `dropped-style-declaration` | déclaration `style` invalide abandonnée | `prop`, `value` |
-| `dropped-href` | `href` en `javascript:` / `vbscript:` / `data:` neutralisé | `href` |
-| `unparsable-date` | date non analysable, affichée telle quelle | `value` |
-| `invalid-locale` | `Intl` a rejeté la locale configurée | `locale`, `value` |
+| `attachment-missing` | a referenced attachment no resolver can find | `path` |
+| `attachment-too-large` | an attachment over `maxInlineBytes`, left unresolved | `path`, `size`, `maxInlineBytes` |
+| `unresolved-reference` | a `SpecRelation` pointing at an object absent from the render | `relation`, `sourceRef`, `targetRef` |
+| `orphan-attribute-value` | a value whose `AttributeDefinition` is absent from the declared `SpecType` | `specObject`, `definitionRef`, `specType` |
+| `missing-spec-object` | a tree node pointing at a `SpecObject` that does not exist | `specHierarchy`, `objectRef` |
+| `duplicate-dom-id` | an object rendered more than once; only the first carries the `id` | `specObject`, `id`, `specHierarchy` |
+| `custom-renderer-threw` | a `customAttributeRenderers` threw and was ignored | `attribute`, `specObject`, `error` |
+| `custom-renderer-unbalanced-html` | custom HTML left unbalanced, escaped as text | `attribute`, `specObject`, `html` |
+| `dropped-tag` | a tag removed along with its subtree (`<script>`, `<iframe>`…) | `tag` |
+| `unwrapped-tag` | a non-allow-listed tag unwrapped, children kept | `tag` |
+| `dropped-style-declaration` | an invalid `style` declaration discarded | `prop`, `value` |
+| `dropped-href` | a `javascript:` / `vbscript:` / `data:` `href` neutralised | `href` |
+| `unparsable-date` | a date that could not be parsed, shown as-is | `value` |
+| `invalid-locale` | `Intl` rejected the configured locale | `locale`, `value` |
 
-Les identifiants rapportés (`specObject`, `specHierarchy`, `relation`…) sont des
-identifiants **ReqIF**, pas des `id` DOM — sauf la clé `id` de `duplicate-dom-id`, qui est
-bien l'ancre HTML en conflit.
+The identifiers reported (`specObject`, `specHierarchy`, `relation`…) are **ReqIF**
+identifiers, not DOM `id`s — except the `id` key of `duplicate-dom-id`, which is indeed
+the conflicting HTML anchor.
 
 ::: warning Volume
-`dropped-tag` et `unwrapped-tag` peuvent se déclencher des milliers de fois sur un gros
-export — chaque `<span>` de mise en forme Word non autorisé compte. C'est un canal de
-diagnostic, pas un journal de production : filtrez par code, ou n'activez l'option qu'en
-investigation.
+`dropped-tag` and `unwrapped-tag` can fire thousands of times on a large export — every
+disallowed Word formatting `<span>` counts. This is a diagnostic channel, not a production
+log: filter by code, or only turn the option on while investigating.
 :::
 
-::: info Le rendu ne change pas
-Brancher un gestionnaire ne modifie strictement rien à la sortie HTML. L'option rend
-visibles des décisions déjà prises, elle n'en prend aucune.
+::: info The rendering does not change
+Wiring up a handler changes strictly nothing about the HTML output. The option makes
+decisions that were already taken visible; it takes none of its own.
 :::

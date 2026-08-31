@@ -86,4 +86,4 @@ const lookup = await createAttachmentLookup(pkg.document, pkg.attachments);
 const html = renderSpecification(spec, index, lookup);
 ```
 
-Voir [Rendu HTML](/api/rendu) pour les signatures complètes.
+Voir [Rendu HTML](/fr/api/rendu) pour les signatures complètes.

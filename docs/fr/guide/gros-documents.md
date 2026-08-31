@@ -61,5 +61,5 @@ certains documents légitimes.
 
 Ces deux erreurs viennent de l'étape de **parsing**, la seule qui peut échouer. Passé ce
 point, plus rien ne lève : une entrée surprenante dégrade localement et le reste du
-document se rend quand même. Voir [Diagnostics](/guide/diagnostics) pour rendre ces
+document se rend quand même. Voir [Diagnostics](/fr/guide/diagnostics) pour rendre ces
 décisions visibles.

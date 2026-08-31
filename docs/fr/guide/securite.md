@@ -53,7 +53,7 @@ soit une tentative de recouvrir votre interface.
 L'élément `<object>` suit la chaîne de repli décrite dans la spec : image PNG résolue →
 sinon objet alternatif imbriqué → sinon lien de téléchargement → sinon texte alternatif.
 Rien n'est jamais chargé depuis le réseau ; seule une pièce jointe fournie par votre
-résolveur peut apparaître. Voir [Pièces jointes](/guide/pieces-jointes).
+résolveur peut apparaître. Voir [Pièces jointes](/fr/guide/pieces-jointes).
 
 ## Ce que la bibliothèque ne fait PAS pour vous
 
@@ -67,7 +67,7 @@ import { escapeHtml } from "reqif-preview";
 render: (value) => `<span class="badge">${escapeHtml(value.value ?? "")}</span>`;
 ```
 
-Un [filet de sécurité](/guide/rendus-personnalises#le-filet-de-securite-html-mal-ferme)
+Un [filet de sécurité](/fr/guide/rendus-personnalises#le-filet-de-securite-html-mal-ferme)
 existe pour les balises mal fermées, mais il ne protège pas de l'injection : il vérifie
 l'équilibre des balises, pas la provenance du texte.
 :::

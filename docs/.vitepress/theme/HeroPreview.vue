@@ -14,10 +14,25 @@
  * competing with the page for the URL fragment, and the real thing is one
  * click away in the sandbox.
  */
+import { computed } from "vue";
 import html from "./hero-preview.generated.html?raw";
 // A raw <a href> is NOT rewritten by VitePress the way a markdown link is, so
 // on a project page served under /reqif-preview/ a bare "/bac-a-sable" 404s.
-import { withBase } from "vitepress";
+import { useData, withBase } from "vitepress";
+
+// The caption and the link it carries follow the page's locale. `lang` is what
+// VitePress derives from the URL prefix, so this needs no prop and no store.
+const { lang } = useData();
+const fr = computed(() => lang.value.startsWith("fr"));
+const caption = computed(() =>
+  fr.value
+    ? "Rendu produit par la bibliothèque à partir du fichier d'exemple."
+    : "Rendered by the library itself, from the sample file.",
+);
+const cta = computed(() =>
+  fr.value ? "Essayez sur votre propre fichier" : "Try it on your own file",
+);
+const playground = computed(() => withBase(fr.value ? "/fr/bac-a-sable" : "/playground"));
 </script>
 
 <template>
@@ -32,8 +47,8 @@ import { withBase } from "vitepress";
       <div class="hp-fade" aria-hidden="true" />
     </div>
     <figcaption>
-      Rendu produit par la bibliothèque à partir du fichier d'exemple.
-      <a :href="withBase('/bac-a-sable')">Essayez sur votre propre fichier</a>.
+      {{ caption }}
+      <a :href="playground">{{ cta }}</a>.
     </figcaption>
   </figure>
 </template>

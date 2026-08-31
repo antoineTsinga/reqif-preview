@@ -82,7 +82,7 @@ const html = await renderPackageToHtml(pkg, {
 });
 ```
 
-La liste complète des libellés est dans [`RenderLabels`](/api/options#renderlabels).
+La liste complète des libellés est dans [`RenderLabels`](/fr/api/options#renderlabels).
 
 ## Dans le navigateur, depuis un `<input type="file">`
 
@@ -102,7 +102,7 @@ La liste complète des libellés est dans [`RenderLabels`](/api/options#renderla
 ```
 
 Voir [`examples/browser.html`](https://github.com/antoineTsinga/reqif-preview/blob/main/examples/browser.html)
-pour une démo complète sans aucun framework — et le [bac à sable](/bac-a-sable) pour la
+pour une démo complète sans aucun framework — et le [bac à sable](/fr/bac-a-sable) pour la
 même chose avec toutes les options exposées.
 
 ## Côté Node.js
@@ -120,7 +120,7 @@ await writeFile("preview.html", html);
 ## Et ensuite
 
 - Le rendu par défaut ne montre pas ce que vous voulez ? →
-  [Titre et contenu affichés](/guide/titre-et-contenu)
-- Plusieurs documents dans un `.reqifz` ? → [Onglets, numérotation, lecture](/guide/mise-en-page)
-- Vous préférez faire votre propre rendu ? → [Votre propre rendu](/guide/rendu-maison)
-- « Il manque des trucs dans mon aperçu » → [Diagnostics](/guide/diagnostics)
+  [Titre et contenu affichés](/fr/guide/titre-et-contenu)
+- Plusieurs documents dans un `.reqifz` ? → [Onglets, numérotation, lecture](/fr/guide/mise-en-page)
+- Vous préférez faire votre propre rendu ? → [Votre propre rendu](/fr/guide/rendu-maison)
+- « Il manque des trucs dans mon aperçu » → [Diagnostics](/fr/guide/diagnostics)

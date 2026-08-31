@@ -13,6 +13,54 @@
  * also sets `aside: false` so VitePress drops its 688px content cap.
  */
 import { computed, onMounted, ref, shallowRef, watch } from "vue";
+import { useData } from "vitepress";
+
+/**
+ * The sandbox's own chrome, per locale. Only the interface is translated: the
+ * option names are the library's API and stay as they are, and the sample file
+ * is French whichever language you read this in.
+ */
+const MESSAGES = {
+  en: {
+    loading: "Loading the library…", loadFailed: "Could not load.",
+    open: "Open a file…", sample: "Sample", attributes: "Attributes", reset: "Reset",
+    stacked: "Documents and specifications stacked one under the other",
+    tabs: "CSS tabs driven by the URL fragment",
+    readingMode: "Reading view", chapterNumbers: "Number 1, 1.1, 1.2…",
+    technical: "Technical panel open", simplified: "Simplified version rather than the original",
+    relations: "Links between requirements",
+    preview: "Preview", code: "Code", diagnostics: "Diagnostics",
+    rendering: "rendering…", renderedAt: "rendered at",
+    copy: "Copied", copyIdle: "Copy",
+    dropHint: ["Drop a", "or a", "anywhere on this block to replace it."],
+    fieldsHint: ["Several values separated by commas, in the order you want. Leaving it empty keeps the default behaviour.", "has no effect without"],
+    codeHint: "This code produces exactly the preview above. Options left at their default value do not appear in it.",
+    noEvents: "No degradation on this file with these options.",
+    thCode: "Code", thCount: "Occurrences", thSample: "Sample message",
+    diagHint: ["Fed live by", "The rendering is strictly identical with or without this handler: the option only makes decisions that were already taken visible."],
+  },
+  fr: {
+    loading: "Chargement de la bibliothèque…", loadFailed: "Échec du chargement.",
+    open: "Ouvrir un fichier…", sample: "Exemple", attributes: "Attributs", reset: "Réinitialiser",
+    stacked: "Documents et spécifications les uns sous les autres",
+    tabs: "Onglets CSS pilotés par le fragment d'URL",
+    readingMode: "Vue de lecture", chapterNumbers: "Numéroter 1, 1.1, 1.2…",
+    technical: "Panneau technique ouvert", simplified: "Version simplifiée plutôt que l'original",
+    relations: "Liens entre exigences",
+    preview: "Aperçu", code: "Code", diagnostics: "Diagnostics",
+    rendering: "rendu en cours…", renderedAt: "rendu à",
+    copy: "Copié", copyIdle: "Copier",
+    dropHint: ["Déposez un", "ou un", "n'importe où sur ce bloc pour le remplacer."],
+    fieldsHint: ["Plusieurs valeurs séparées par des virgules, dans l'ordre voulu. Laisser vide garde le comportement par défaut.", "n'a d'effet qu'avec"],
+    codeHint: "Ce code produit exactement l'aperçu ci-dessus. Les options laissées à leur valeur par défaut n'y apparaissent pas.",
+    noEvents: "Aucune dégradation sur ce fichier avec ces options.",
+    thCode: "Code", thCount: "Occurrences", thSample: "Exemple de message",
+    diagHint: ["Alimenté en direct par", "Le rendu est strictement identique avec ou sans ce gestionnaire : l'option ne fait que rendre visibles des décisions déjà prises."],
+  },
+} as const;
+
+const { lang } = useData();
+const t = computed(() => (lang.value.startsWith("fr") ? MESSAGES.fr : MESSAGES.en));
 
 type Lib = typeof import("../../../src/index.js");
 type Degradation = { code: string; message: string; detail?: unknown };
@@ -21,7 +69,7 @@ const lib = shallowRef<Lib | null>(null);
 const pkg = shallowRef<unknown>(null);
 
 const html = ref("");
-const status = ref("Chargement de la bibliothèque…");
+const status = ref("");
 const error = ref("");
 const busy = ref(false);
 const fileName = ref("exemple.reqifz");
@@ -44,13 +92,13 @@ const contentAttributes = ref("");
 const titleAttributes = ref("");
 
 /** The boolean options, as toggle chips. */
-const toggles = [
-  { model: readingMode, label: "readingMode", hint: "Vue de lecture" },
-  { model: chapterNumbers, label: "chapterNumbers", hint: "Numéroter 1, 1.1, 1.2…" },
-  { model: showTechnicalByDefault, label: "showTechnicalByDefault", hint: "Panneau technique ouvert" },
-  { model: preferSimplifiedXhtml, label: "preferSimplifiedXhtml", hint: "Version simplifiée plutôt que l'original" },
-  { model: showRelations, label: "showRelations", hint: "Liens entre exigences" },
-];
+const toggles = computed(() => [
+  { model: readingMode, label: "readingMode", hint: t.value.readingMode },
+  { model: chapterNumbers, label: "chapterNumbers", hint: t.value.chapterNumbers },
+  { model: showTechnicalByDefault, label: "showTechnicalByDefault", hint: t.value.technical },
+  { model: preferSimplifiedXhtml, label: "preferSimplifiedXhtml", hint: t.value.simplified },
+  { model: showRelations, label: "showRelations", hint: t.value.relations },
+]);
 
 /** "a, b" -> ["a", "b"]; blank -> undefined, so the option stays at its default. */
 function list(raw: string): string[] | undefined {
@@ -118,7 +166,7 @@ async function render() {
       onDegradation: (e) => collected.push(e as Degradation),
     } as never);
     events.value = collected;
-    status.value = `${fileName.value} — rendu à ${new Date().toLocaleTimeString("fr-FR")}`;
+    status.value = `${fileName.value} — ${t.value.renderedAt} ${new Date().toLocaleTimeString(lang.value)}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -190,7 +238,7 @@ onMounted(async () => {
     await loadSample();
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
-    status.value = "Échec du chargement.";
+    status.value = t.value.loadFailed;
   }
 });
 
@@ -210,9 +258,9 @@ watch(renderOptions, render, { deep: true });
       <div class="pg-bar-row">
         <label class="pg-btn pg-btn-primary">
           <input type="file" accept=".reqif,.reqifz,.xml" hidden @change="onFile" />
-          Ouvrir un fichier…
+          {{ t.open }}
         </label>
-        <button class="pg-btn" type="button" @click="loadSample">Exemple</button>
+        <button class="pg-btn" type="button" @click="loadSample">{{ t.sample }}</button>
 
         <span class="pg-sep" aria-hidden="true"></span>
 
@@ -221,7 +269,7 @@ watch(renderOptions, render, { deep: true });
             type="button"
             :class="{ on: layout === 'stacked' }"
             @click="layout = 'stacked'"
-            title="Documents et spécifications les uns sous les autres"
+            :title="t.stacked"
           >
             stacked
           </button>
@@ -229,7 +277,7 @@ watch(renderOptions, render, { deep: true });
             type="button"
             :class="{ on: layout === 'tabs' }"
             @click="layout = 'tabs'"
-            title="Onglets CSS pilotés par le fragment d'URL"
+            :title="t.tabs"
           >
             tabs
           </button>
@@ -259,7 +307,7 @@ watch(renderOptions, render, { deep: true });
           :aria-expanded="showAdvanced"
           @click="showAdvanced = !showAdvanced"
         >
-          Attributs {{ showAdvanced ? "▴" : "▾" }}
+          {{ t.attributes }} {{ showAdvanced ? "▴" : "▾" }}
         </button>
         <button
           class="pg-btn pg-btn-ghost"
@@ -267,7 +315,7 @@ watch(renderOptions, render, { deep: true });
           :disabled="changedCount === 0"
           @click="reset"
         >
-          Réinitialiser
+          {{ t.reset }}
         </button>
       </div>
 
@@ -294,25 +342,24 @@ watch(renderOptions, render, { deep: true });
           <input v-model="dateLocale" type="text" placeholder="fr-FR" />
         </label>
         <p class="pg-hint">
-          Plusieurs valeurs séparées par des virgules, dans l'ordre voulu. Laisser vide
-          garde le comportement par défaut. <code>chapterNumberAttributes</code> n'a
-          d'effet qu'avec <code>chapterNumbers</code>.
+          {{ t.fieldsHint[0] }} <code>chapterNumberAttributes</code>
+          {{ t.fieldsHint[1] }} <code>chapterNumbers</code>.
         </p>
       </div>
     </div>
 
     <!-- Output --------------------------------------------------------------->
     <nav class="pg-tabs">
-      <button :class="{ on: rightTab === 'apercu' }" @click="rightTab = 'apercu'">Aperçu</button>
+      <button :class="{ on: rightTab === 'apercu' }" @click="rightTab = 'apercu'">{{ t.preview }}</button>
       <button :class="{ on: rightTab === 'code' }" @click="rightTab = 'code'">
-        Code
+        {{ t.code }}
         <span v-if="changedCount" class="pg-badge pg-badge-soft">{{ changedCount }}</span>
       </button>
       <button :class="{ on: rightTab === 'diagnostics' }" @click="rightTab = 'diagnostics'">
-        Diagnostics
+        {{ t.diagnostics }}
         <span v-if="groupedEvents.length" class="pg-badge">{{ groupedEvents.length }}</span>
       </button>
-      <span class="pg-status">{{ busy ? "rendu en cours…" : status }}</span>
+      <span class="pg-status">{{ busy ? t.rendering : status || t.loading }}</span>
     </nav>
 
     <p v-if="error" class="pg-error">{{ error }}</p>
@@ -331,29 +378,28 @@ watch(renderOptions, render, { deep: true });
              page. -->
         <div class="pg-render vp-raw" v-html="html" />
         <p class="pg-drop-hint">
-          Déposez un <code>.reqif</code> ou un <code>.reqifz</code> n'importe où sur ce
-          bloc pour le remplacer.
+          {{ t.dropHint[0] }} <code>.reqif</code> {{ t.dropHint[1] }} <code>.reqifz</code>
+          {{ t.dropHint[2] }}
         </p>
       </div>
 
       <div v-show="rightTab === 'code'">
         <button class="pg-copy" type="button" @click="copySnippet">
-          {{ copied ? "Copié" : "Copier" }}
+          {{ copied ? t.copy : t.copyIdle }}
         </button>
         <pre class="pg-code"><code>{{ snippet }}</code></pre>
         <p class="pg-hint">
-          Ce code produit exactement l'aperçu ci-dessus. Les options laissées à leur valeur
-          par défaut n'y apparaissent pas.
+          {{ t.codeHint }}
         </p>
       </div>
 
       <div v-show="rightTab === 'diagnostics'">
         <p v-if="!groupedEvents.length" class="pg-hint">
-          Aucune dégradation sur ce fichier avec ces options.
+          {{ t.noEvents }}
         </p>
         <table v-else class="pg-diag">
           <thead>
-            <tr><th>Code</th><th>Occurrences</th><th>Exemple de message</th></tr>
+            <tr><th>{{ t.thCode }}</th><th>{{ t.thCount }}</th><th>{{ t.thSample }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="g in groupedEvents" :key="g.code">
@@ -364,9 +410,7 @@ watch(renderOptions, render, { deep: true });
           </tbody>
         </table>
         <p class="pg-hint">
-          Alimenté en direct par <code>onDegradation</code>. Le rendu est strictement
-          identique avec ou sans ce gestionnaire : l'option ne fait que rendre visibles des
-          décisions déjà prises.
+          {{ t.diagHint[0] }} <code>onDegradation</code>. {{ t.diagHint[1] }}
         </p>
       </div>
     </div>

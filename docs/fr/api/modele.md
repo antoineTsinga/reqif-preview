@@ -167,7 +167,7 @@ interface AttributeValueXhtml {
 type AttributeValue = /* l'union des sept ci-dessus */;
 ```
 
-Sur `isSimplified` et `originalValue`, voir [Texte simplifié](/guide/texte-simplifie).
+Sur `isSimplified` et `originalValue`, voir [Texte simplifié](/fr/guide/texte-simplifie).
 
 ## Contenu XHTML
 
@@ -245,7 +245,7 @@ de l'éditabilité.
 Un nœud (`SpecHierarchy`) n'est **pas** une exigence : il pointe vers une (`objectRef`). Le
 même `SpecObject` peut donc apparaître à plusieurs endroits de l'arbre — c'est légal, c'est
 courant, et c'est ce qui rend `duplicate-dom-id` nécessaire. Voir
-[Liens entre exigences](/guide/relations#objets-rendus-plusieurs-fois).
+[Liens entre exigences](/fr/guide/relations#objets-rendus-plusieurs-fois).
 :::
 
 ## `ReqIfIndex`

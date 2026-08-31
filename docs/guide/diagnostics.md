@@ -1,11 +1,11 @@
-# Diagnostiquer ce qui a été dégradé (`onDegradation`)
+# Diagnosing what was degraded (`onDegradation`)
 
 <!--@include: ../_conventions.md-->
 
-Passé l'étape de parsing, **rien ne lève**. Une entrée surprenante dégrade localement et le
-reste du document se rend quand même. C'est le bon comportement en production — un aperçu
-d'exigences vaut mieux qu'une page blanche — et c'est pénible en support : face à « il
-manque des trucs dans mon aperçu », il n'y avait aucun moyen d'obtenir un rapport.
+Past the parsing stage, **nothing throws**. A surprising input degrades locally and the
+rest of the document still renders. That is the right behaviour in production — a
+requirements preview beats a blank page — and a miserable one in support: faced with
+"things are missing from my preview", there is nothing to inspect.
 
 ```ts
 import type { DegradationEvent } from "reqif-preview";
@@ -17,40 +17,40 @@ const html = await renderPackageToHtml(pkg, { onDegradation: (e) => events.push(
 //    detail: { path: "schema.png" } }, …]
 ```
 
-::: info Le rendu est strictement identique avec ou sans gestionnaire
-L'option ne change rien à la sortie. Elle ne fait que rendre visibles des décisions qui
-étaient déjà prises, silencieusement. Vous pouvez donc la brancher en production sans
-craindre un changement de comportement.
+::: info The rendering is strictly identical with or without a handler
+The option changes nothing about the output. It only makes visible decisions that were
+already being taken, silently. You can therefore wire it up in production without fearing
+a change in behaviour.
 :::
 
-## Les codes émis
+## The codes emitted
 
 | Code | Situation |
 |---|---|
-| `attachment-missing` | pièce jointe référencée qu'aucun résolveur ne trouve |
-| `attachment-too-large` | pièce jointe dépassant `maxInlineBytes`, laissée non résolue |
-| `unresolved-reference` | `SpecRelation` visant un objet absent du rendu |
-| `duplicate-dom-id` | objet rendu plusieurs fois ; seule la première occurrence porte l'`id` |
-| `orphan-attribute-value` | valeur dont l'`AttributeDefinition` est absente du `SpecType` déclaré |
-| `missing-spec-object` | nœud d'arborescence pointant vers un `SpecObject` inexistant |
-| `custom-renderer-threw` | un `customAttributeRenderers` a levé et a été ignoré |
-| `custom-renderer-unbalanced-html` | HTML personnalisé mal fermé, échappé en texte |
-| `dropped-tag` | balise supprimée avec son sous-arbre (`<script>`, `<iframe>`…) |
-| `unwrapped-tag` | balise hors liste blanche déballée, enfants conservés |
-| `dropped-style-declaration` | déclaration `style` invalide abandonnée |
-| `dropped-href` | `href` en `javascript:` / `vbscript:` / `data:` neutralisé |
-| `unparsable-date` | date non analysable, affichée telle quelle |
-| `invalid-locale` | `Intl` a rejeté la locale configurée |
+| `attachment-missing` | a referenced attachment no resolver can find |
+| `attachment-too-large` | an attachment over `maxInlineBytes`, left unresolved |
+| `unresolved-reference` | a `SpecRelation` pointing at an object absent from the render |
+| `duplicate-dom-id` | an object rendered more than once; only the first carries the `id` |
+| `orphan-attribute-value` | a value whose `AttributeDefinition` is absent from the declared `SpecType` |
+| `missing-spec-object` | a tree node pointing at a `SpecObject` that does not exist |
+| `custom-renderer-threw` | a `customAttributeRenderers` threw and was ignored |
+| `custom-renderer-unbalanced-html` | custom HTML left unbalanced, escaped as text |
+| `dropped-tag` | a tag removed along with its subtree (`<script>`, `<iframe>`…) |
+| `unwrapped-tag` | a non-allow-listed tag unwrapped, children kept |
+| `dropped-style-declaration` | an invalid `style` declaration discarded |
+| `dropped-href` | a `javascript:` / `vbscript:` / `data:` `href` neutralised |
+| `unparsable-date` | a date that could not be parsed, shown as-is |
+| `invalid-locale` | `Intl` rejected the configured locale |
 
-## Un canal de diagnostic, pas un journal
+## A diagnostic channel, not a log
 
 ::: warning
-`dropped-tag` et `unwrapped-tag` peuvent se déclencher **des milliers de fois** sur un gros
-export : chaque `<span>` de mise en forme Word non autorisé compte. Filtrez par code, ou
-n'activez l'option qu'en investigation.
+`dropped-tag` and `unwrapped-tag` can fire **thousands of times** on a large export: every
+disallowed Word formatting `<span>` counts. Filter by code, or only turn the option on
+while investigating.
 :::
 
-En pratique, ce qui est exploitable est l'**agrégat**, pas la liste brute :
+In practice what you can act on is the **aggregate**, not the raw list:
 
 ```ts
 const byCode = new Map<string, number>();
@@ -60,23 +60,23 @@ await renderPackageToHtml(pkg, {
 console.table([...byCode]);
 ```
 
-C'est exactement ce que fait le panneau « Diagnostics » du [bac à sable](/bac-a-sable) :
-une ligne par code, avec un compteur et un message d'exemple.
+That is exactly what the "Diagnostics" panel of the [playground](/playground) does: one
+row per code, with a counter and a sample message.
 
-## Un handler qui lève est ignoré
+## A handler that throws is ignored
 
-Une exception dans votre gestionnaire est interceptée et avalée. Un canal de diagnostic qui
-casse ce qu'il observe serait pire que pas de canal du tout.
+An exception in your handler is caught and swallowed. A diagnostic channel that broke what
+it was observing would be worse than no channel at all.
 
-## Ce qu'il faut regarder en premier
+## What to look at first
 
-| Symptôme rapporté | Code à chercher |
+| Reported symptom | Code to look for |
 |---|---|
-| « Les images ne s'affichent pas » | `attachment-missing`, `attachment-too-large` |
-| « Ce lien de traçabilité ne mène nulle part » | `unresolved-reference` |
-| « Cliquer sur un lien m'amène au mauvais endroit » | `duplicate-dom-id` |
-| « Il manque une exigence entière » | `missing-spec-object` |
-| « Un attribut n'apparaît pas dans le panneau technique » | `orphan-attribute-value` |
-| « Ma mise en forme est perdue » | `dropped-tag`, `unwrapped-tag`, `dropped-style-declaration` |
-| « Mon badge personnalisé s'affiche en texte brut » | `custom-renderer-unbalanced-html` |
-| « Les dates sont bizarres » | `unparsable-date`, `invalid-locale` |
+| "The images do not show" | `attachment-missing`, `attachment-too-large` |
+| "This traceability link goes nowhere" | `unresolved-reference` |
+| "Clicking a link takes me to the wrong place" | `duplicate-dom-id` |
+| "A whole requirement is missing" | `missing-spec-object` |
+| "An attribute is absent from the technical panel" | `orphan-attribute-value` |
+| "My formatting is lost" | `dropped-tag`, `unwrapped-tag`, `dropped-style-declaration` |
+| "My custom badge shows as plain text" | `custom-renderer-unbalanced-html` |
+| "The dates look odd" | `unparsable-date`, `invalid-locale` |

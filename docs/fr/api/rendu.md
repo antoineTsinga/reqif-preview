@@ -133,7 +133,7 @@ interface XhtmlRenderOptions {
 
 Sérialise un fragment XHTML isolé en HTML **assaini** — liste blanche de balises et
 d'attributs, schémas d'URL exécutables neutralisés, `style` restreint à `color` et
-`text-decoration`. Voir [Sécurité](/guide/securite).
+`text-decoration`. Voir [Sécurité](/fr/guide/securite).
 
 C'est la brique à utiliser si vous construisez votre propre rendu et voulez juste afficher
 le corps d'une exigence sans reprendre toute la mise en page.
@@ -164,7 +164,7 @@ function escapeHtml(s: string): string;
 ```
 
 Échappe `&`, `<`, `>` et les guillemets. Exporté parce que le HTML retourné par vos
-[`customAttributeRenderers`](/api/options#customattributerenderer) **n'est pas assaini** :
+[`customAttributeRenderers`](/fr/api/options#customattributerenderer) **n'est pas assaini** :
 si vous y interpolez du texte venant du fichier, c'est à vous de l'échapper.
 
 ```ts

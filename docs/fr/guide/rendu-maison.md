@@ -35,7 +35,7 @@ for (const spec of doc.coreContent.specifications) {
 
 `ReqIfIndex` accepte aussi bien un document qu'un tableau de documents. Pour un `.reqifz`
 multi-documents, passez `pkg.documents` — c'est ce qui fait résoudre les relations qui
-traversent la frontière entre deux `.reqif`. Voir [Liens entre exigences](/guide/relations).
+traversent la frontière entre deux `.reqif`. Voir [Liens entre exigences](/fr/guide/relations).
 
 ## Lire une valeur d'attribut
 
@@ -63,8 +63,8 @@ Pour un `AttributeValueXHTML`, vous disposez de :
 | Expression | Résultat |
 |---|---|
 | `value.value` | un arbre `XhtmlNode[]` portable, sans dépendance au DOM |
-| `value.originalValue` | l'original avant simplification, s'il existe ([détails](/guide/texte-simplifie)) |
-| `renderXhtmlContent(value.value, { attachments })` | sérialise cet arbre en HTML **assaini** ([sécurité](/guide/securite)) |
+| `value.originalValue` | l'original avant simplification, s'il existe ([détails](/fr/guide/texte-simplifie)) |
+| `renderXhtmlContent(value.value, { attachments })` | sérialise cet arbre en HTML **assaini** ([sécurité](/fr/guide/securite)) |
 | `xhtmlToPlainText(value.value)` | extrait le texte brut — recherche plein texte, export CSV |
 
 L'arbre `XhtmlNode` est délibérément minimal : un nœud est soit `{ type: "text", value }`,
@@ -99,4 +99,4 @@ const html = renderSpecification(spec, index, lookup); // sync
 Les définitions exactes sont dans
 [`src/types.ts`](https://github.com/antoineTsinga/reqif-preview/blob/main/src/types.ts),
 annotées avec le numéro de clause de la spec qu'elles implémentent. La page
-[Modèle de données](/api/modele) en donne la carte.
+[Modèle de données](/fr/api/modele) en donne la carte.

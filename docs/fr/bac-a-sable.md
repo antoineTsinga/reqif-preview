@@ -33,7 +33,7 @@ mutuellement, dans le scénario d'échange que la spec présente en ouverture
 | `03-plan-de-validation.reqif` | Les essais `TST-…`, qui *vérifient* des SRS |
 
 Il contient **volontairement des anomalies**, pour que le panneau
-[Diagnostics](/guide/diagnostics) ait quelque chose à montrer :
+[Diagnostics](/fr/guide/diagnostics) ait quelque chose à montrer :
 
 - une relation `TST-002 → SRS-999-absent` qui ne pointe sur rien : `unresolved-reference` ;
 - l'objet `CRS-003` rendu à deux endroits de l'arborescence : `duplicate-dom-id` ;
@@ -50,11 +50,11 @@ Il contient **volontairement des anomalies**, pour que le panneau
 L'onglet « Exigences système » s'ouvre de lui-même, **et** la bonne spécification
 à l'intérieur (« Capteurs » ou « Interface conducteur »), défilée jusqu'à
 l'exigence : c'est le fragment d'URL qui pilote l'affichage, aux deux niveaux
-d'imbrication à la fois. Voir [Onglets, numérotation, lecture](/guide/mise-en-page).
+d'imbrication à la fois. Voir [Onglets, numérotation, lecture](/fr/guide/mise-en-page).
 
 **Comparer original et version simplifiée.** Basculez `preferSimplifiedXhtml` et
 regardez l'exigence porteuse du drapeau : par défaut la bibliothèque affiche
-l'original, plus fidèle. Voir [Texte simplifié](/guide/texte-simplifie).
+l'original, plus fidèle. Voir [Texte simplifié](/fr/guide/texte-simplifie).
 
 **Passer en vue de lecture.** Cochez `readingMode` puis `chapterNumbers` : les
 encadrés d'ID, la ligne « créé/modifié » et le panneau technique disparaissent, et
@@ -64,6 +64,6 @@ les titres deviennent de vraies balises `<h3>`…`<h6>` numérotées. C'est le r
 ::: tip Le hash de cette page va changer
 Les onglets sont de vrais liens : cliquer un onglet écrit un fragment dans l'URL
 de la page — y compris celle-ci. C'est exactement la contrepartie documentée dans
-[Onglets, numérotation, lecture](/guide/mise-en-page#deux-contreparties-assumees),
+[Onglets, numérotation, lecture](/fr/guide/mise-en-page#deux-contreparties-assumees),
 et la voir à l'œuvre ici vaut mieux que de la lire.
 :::

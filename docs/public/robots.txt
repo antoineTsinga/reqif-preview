@@ -1,0 +1,8 @@
+# The redirect stubs under /guide/ and /api/ carry their own noindex: they
+# exist so the URLs published in reqif-preview@0.1.1 keep working, not to be
+# indexed alongside the pages they point at.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://reqif-preview.dev/sitemap.xml
