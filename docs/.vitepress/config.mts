@@ -5,10 +5,11 @@ import { createRequire } from "node:module";
 // is a version that will disagree with itself on the next release.
 const { version } = createRequire(import.meta.url)("../../package.json");
 
-// Project page, not a user page: the site is served from
-// https://antoinetsinga.github.io/reqif-preview/ — without this base, every
-// asset URL points at the domain root and the site renders unstyled.
-const BASE = "/reqif-preview/";
+// Served at the root of its own domain, so the base is "/". It was
+// "/reqif-preview/" while the site lived under a github.io project page: get
+// this wrong and every asset URL misses by one path segment, which shows up as
+// a site rendering with no styles at all rather than as a visible error.
+const BASE = "/";
 
 export default defineConfig({
   base: BASE,
