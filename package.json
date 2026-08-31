@@ -1,6 +1,6 @@
 {
   "name": "reqif-preview",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Framework-independent library to parse and preview ReqIF (.reqif / .reqifz) files in the browser or Node.js",
   "keywords": [
     "reqif",
