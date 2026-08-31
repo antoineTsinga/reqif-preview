@@ -31,7 +31,7 @@ document.getElementById("preview").innerHTML = html;
 
 C'est tout pour le cas simple : `loadReqIfPackage` détecte automatiquement si l'entrée est du XML brut (`.reqif`) ou une archive zip (`.reqifz`), extrait les pièces jointes, et `renderPackageToHtml` produit un bloc HTML autonome (avec son propre `<style>` scoping `.reqif-preview`) — arborescence des spécifications, texte enrichi (gras/italique/listes/tableaux), images intégrées en `data:` URI.
 
-Voir [`examples/browser.html`](./examples/browser.html) pour une démo complète sans aucun framework.
+Pour voir le résultat sur **votre** fichier avant d'installer quoi que ce soit, le [bac à sable](https://antoinetsinga.github.io/reqif-preview/bac-a-sable) exécute la bibliothèque dans votre navigateur — rien n'est envoyé nulle part. Et [`examples/browser.html`](https://github.com/antoineTsinga/reqif-preview/blob/main/examples/browser.html) est une page autonome, sans aucun framework ni outil de build.
 
 ## Documentation
 
@@ -50,33 +50,12 @@ Tout le reste vit sur le [site de documentation](https://antoinetsinga.github.io
 | [Diagnostics](https://antoinetsinga.github.io/reqif-preview/guide/diagnostics) | `onDegradation` et ses 14 codes |
 | [Sécurité](https://antoinetsinga.github.io/reqif-preview/guide/securite) | liste blanche, `style`, schémas d'URL |
 | [Votre propre rendu](https://antoinetsinga.github.io/reqif-preview/guide/rendu-maison) | le modèle typé, `ReqIfIndex`, les helpers |
-| [Référence API](https://antoinetsinga.github.io/reqif-preview/api/) | les 78 exports publics |
+| [Référence API](https://antoinetsinga.github.io/reqif-preview/api/) | tous les exports publics, un par un |
 
-Les notes d'implémentation — comment le parseur, l'index et le renderer sont construits — sont dans [`ALGORITHMES.md`](./ALGORITHMES.md).
+## Contribuer
 
-## Développement
-
-```bash
-npm install
-npm test         # vitest — inclut un vrai export IBM DOORS en fixture
-npm run build    # esm + cjs + .d.ts dans dist/
-npm run typecheck
-```
-
-### Le site de documentation
-
-```bash
-npm run docs:dev      # build + synchro des assets + serveur de développement
-npm run docs:build    # ce que la CI exécute
-npm run docs:preview   # sert le site construit
-```
-
-Deux garde-fous s'exécutent dans `docs:build`, et ils sont là pour une raison précise — la page de documentation précédente inlinait une copie du bundle collée à la main, jamais régénérée, et décrivait au bout de deux mois une version qui n'existait plus :
-
-- [`scripts/sync-docs-assets.mjs`](./scripts/sync-docs-assets.mjs) copie `dist/index.js` vers `docs/public/` et régénère le `.reqifz` d'exemple. Les deux sont gitignorés : ce sont des artefacts, jamais du contenu de dépôt.
-- [`scripts/check-docs.mjs`](./scripts/check-docs.mjs) **fait échouer le build** si un symbole exporté par `src/index.ts` n'est documenté nulle part sous `docs/api/`. La liste des exports est lue via le compilateur TypeScript, donc `export * from "./types.js"` est développé exactement comme un consommateur le voit.
-
-Le déploiement sur GitHub Pages se fait à chaque push sur `main` via [`.github/workflows/docs.yml`](./.github/workflows/docs.yml).
+Les commandes de développement, le fonctionnement du site de documentation et la
+procédure de publication sont dans [CONTRIBUTING.md](https://github.com/antoineTsinga/reqif-preview/blob/main/CONTRIBUTING.md).
 
 ## Licence
 
