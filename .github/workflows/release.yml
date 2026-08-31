@@ -1,0 +1,74 @@
+name: Publication npm
+
+# Publishing is driven by a GitHub Release: draft it, write the notes, publish
+# it, and this runs. The tag and the notes therefore exist before the tarball
+# does, and a failed run is re-runnable from the Actions tab without having to
+# invent a new version number.
+on:
+  release:
+    types: [published]
+  # Kept for a re-run after fixing a transient failure. It publishes whatever
+  # `main` currently holds, so only use it when main is the release commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required for npm provenance: the OIDC token is what lets npm attest that
+  # this tarball was built by this workflow, from this commit.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/reqif-preview
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      # The one check that cannot be recovered from after the fact: npm refuses
+      # to republish a version, so a mismatch here would burn the number.
+      - name: The tag must match package.json
+        if: github.event_name == 'release'
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p 'require("./package.json").version')"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Le tag $GITHUB_REF_NAME annonce $tag, package.json dit $pkg."
+            exit 1
+          fi
+          echo "version $pkg"
+
+      - name: Already on npm?
+        shell: bash
+        run: |
+          pkg="$(node -p 'require("./package.json").version')"
+          if npm view "reqif-preview@$pkg" version >/dev/null 2>&1; then
+            echo "::error::reqif-preview@$pkg est déjà publié. Montez la version."
+            exit 1
+          fi
+
+      - run: npm run typecheck
+      - run: npm test
+
+      # `npm publish` runs prepublishOnly, which builds and tests again. That is
+      # deliberate: the tarball must come from this checkout, never from a dist/
+      # someone had lying around.
+      - name: Publish
+        run: npm publish
+        env:
+          # Trusted Publishing (npm > Package settings > Trusted publisher)
+          # needs no secret and is the recommended path. If you set up a
+          # granular access token instead, add it as the NPM_TOKEN secret —
+          # this line then picks it up and nothing else changes.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

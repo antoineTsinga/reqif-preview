@@ -11,7 +11,7 @@ Le même objet est accepté par `renderPackageToHtml`, `renderDocumentToHtml` et
 
 | Option | Type | Défaut | Effet |
 |---|---|---|---|
-| `includeCss` | `boolean` | `true` | Inclut la feuille de style par défaut dans un `<style>` en tête de la sortie. |
+| `includeCss` | `boolean` | `true` | Inclut la feuille de style par défaut dans un `<style>` en tête de la sortie. Si `false`, chargez-la via `reqif-preview/style.css` ou l'export `DEFAULT_CSS` — voir [Feuille de style](/api/#feuille-de-style). |
 | `layout` | `"stacked" \| "tabs"` | `"stacked"` | Onglets CSS entre documents et entre spécifications. Sans effet s'il n'y en a qu'un. [Détails](/guide/mise-en-page) |
 | `readingMode` | `boolean` | `false` | Vue de lecture : masque ID, créé/modifié et panneau technique ; titres en `<h3>`…`<h6>`. |
 | `chapterNumbers` | `boolean` | `false` | Préfixe les titres de `1`, `1.1`, `1.1.1`… en repartant à 1 par `Specification`. |

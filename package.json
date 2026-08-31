@@ -2,6 +2,24 @@
   "name": "reqif-preview",
   "version": "0.1.0",
   "description": "Framework-independent library to parse and preview ReqIF (.reqif / .reqifz) files in the browser or Node.js",
+  "keywords": [
+    "reqif",
+    "reqifz",
+    "requirements",
+    "parser",
+    "preview",
+    "omg"
+  ],
+  "license": "MIT",
+  "author": "Antoine Tsinga",
+  "homepage": "https://antoinetsinga.github.io/reqif-preview/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antoineTsinga/reqif-preview.git"
+  },
+  "bugs": {
+    "url": "https://github.com/antoineTsinga/reqif-preview/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,25 +36,24 @@
     "dist"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist",
+    "build": "tsup && tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist && node scripts/emit-style.mjs",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:dev": "npm run build && node scripts/sync-docs-assets.mjs && vitepress dev docs",
     "docs:build": "npm run build && node scripts/sync-docs-assets.mjs && node scripts/check-docs.mjs && node scripts/check-doc-examples.mjs && vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": [
-    "reqif",
-    "reqifz",
-    "requirements",
-    "parser",
-    "preview",
-    "omg"
-  ],
-  "license": "MIT",
   "dependencies": {
     "fast-xml-parser": "^5.11.0",
     "fflate": "0.8.3"
