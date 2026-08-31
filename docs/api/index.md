@@ -63,6 +63,31 @@ les `<style>` inline, ou d'un thème maison :
 const html = await renderPackageToHtml(pkg, { includeCss: false });
 ```
 
-À vous alors d'écrire les règles pour les classes émises (`.reqif-preview`, `.reqif-node`,
-`.reqif-tabs`…). Les onglets, en particulier, **cessent de fonctionner sans elles** : leur
-mécanisme est entièrement porté par les règles `:target` de cette feuille.
+La feuille reste alors accessible de deux façons, l'une et l'autre issues de la **même
+source**, donc jamais désynchronisées :
+
+```ts
+// Un fichier, pour un <link> ou un import de bundler.
+import "reqif-preview/style.css";
+```
+
+```ts
+// Le texte, pour ce qu'un <link> n'atteint pas — un Shadow DOM, par exemple.
+import { DEFAULT_CSS } from "reqif-preview";
+
+const shadowRoot = document.getElementById("preview")!.attachShadow({ mode: "open" });
+
+const sheet = new CSSStyleSheet();
+sheet.replaceSync(DEFAULT_CSS);
+shadowRoot.adoptedStyleSheets = [sheet];
+```
+
+Si vous écrivez vos propres règles à la place, sachez que les onglets **cessent de
+fonctionner sans elles** : leur mécanisme est entièrement porté par les règles `:target` de
+cette feuille.
+
+::: warning La feuille suppose un fond clair
+`.reqif-preview` fixe une couleur de texte (`#1a1a1a`) mais aucun fond. Inséré tel quel dans
+une page au thème sombre, l'aperçu serait illisible : c'est à l'hôte de fournir une surface
+claire.
+:::

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes an in-flight run on the same ref; main is excluded so
+# its history keeps a result for every commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Report every failing combination, not just the first one to go red.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # 20 is the floor declared in package.json engines; 24 is the current
+        # line. Windows is here because that is where this is developed and the
+        # scripts join paths — a separator bug would never show on Linux alone.
+        node: [20, 22, 24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # Also proves the package still builds on this Node, and that
+      # scripts/emit-style.mjs can read DEFAULT_CSS out of the bundle.
+      - name: Build
+        run: npm run build
+
+      - name: The advertised exports must exist
+        shell: bash
+        run: |
+          for f in dist/index.js dist/index.cjs dist/index.d.ts dist/style.css; do
+            test -s "$f" || { echo "::error::$f manquant ou vide"; exit 1; }
+          done
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # check-docs fails if an export is documented nowhere; check-doc-examples
+      # fails if an example uses a variable that comes from nowhere. Running
+      # them on pull requests is the point — catching it after the merge is
+      # what these guards exist to avoid.
+      - run: npm run docs:build
