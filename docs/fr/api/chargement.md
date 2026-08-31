@@ -26,7 +26,7 @@ pkg.attachments; // AttachmentResolver (EMPTY_ATTACHMENTS pour un .reqif nu)
 ::: warning `pkg.document` ne suffit pas toujours
 Pour construire un index ou rendre un paquet, utilisez `pkg.documents`. `pkg.document` ne
 renvoie que le premier — les relations qui traversent la frontière entre deux `.reqif` ne
-résolvent alors plus. Voir [Liens entre exigences](/guide/relations).
+résolvent alors plus. Voir [Liens entre exigences](/fr/guide/relations).
 :::
 
 ## `parseReqIfXml`
@@ -54,7 +54,7 @@ interface ParseOptions {
 | `processEntities` | limites relevées | Garde-fous d'expansion d'entités XML. Objet partiel, ou `false` pour désactiver entièrement le traitement des entités. |
 
 Les deux sont des **décisions de sécurité** avant d'être des réglages de confort — voir
-[Documents très imbriqués](/guide/gros-documents).
+[Documents très imbriqués](/fr/guide/gros-documents).
 
 ## `ReqIfParseError`
 
@@ -73,7 +73,7 @@ La **seule** erreur que cette bibliothèque lève. Les cas :
 - balise de type de donnée, de type d'objet, de définition ou de valeur d'attribut inconnue.
 
 Tout ce qui se passe **après** le parsing dégrade silencieusement plutôt que de lever
-([diagnostics](/api/diagnostics)).
+([diagnostics](/fr/api/diagnostics)).
 
 ```ts
 try {
@@ -152,4 +152,4 @@ interface ReqIfPackage {
 }
 ```
 
-Le résultat du chargement, et l'entrée de [`renderPackageToHtml`](/api/rendu).
+Le résultat du chargement, et l'entrée de [`renderPackageToHtml`](/fr/api/rendu).

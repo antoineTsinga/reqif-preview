@@ -53,7 +53,7 @@ const html = await renderPackageToHtml(pkg, {
   déjà affiché par votre rendu.
 - Une exception levée dans `render()` est interceptée : elle n'interrompt jamais le rendu
   du reste du document. L'événement `custom-renderer-threw` est émis
-  ([diagnostics](/guide/diagnostics)).
+  ([diagnostics](/fr/guide/diagnostics)).
 - Le HTML retourné est inséré **tel quel**. Ce n'est pas du contenu du document ReqIF,
   mais du code que *vous* écrivez — il n'est donc pas assaini. Échappez vous-même tout
   texte brut interpolé, par exemple avec `escapeHtml`, exporté par la bibliothèque.

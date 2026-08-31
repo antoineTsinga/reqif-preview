@@ -49,7 +49,7 @@ peut avoir *perdu* du texte — un tableau aplati, une liste écrasée — et un
 plein texte ou un export CSV veut la source la plus complète, pas la plus jolie.
 
 ::: tip Voir la différence
-Le [bac à sable](/bac-a-sable) charge un exemple dont une exigence porte les deux
+Le [bac à sable](/fr/bac-a-sable) charge un exemple dont une exigence porte les deux
 versions. Cochez `preferSimplifiedXhtml` et regardez-la changer.
 :::
 

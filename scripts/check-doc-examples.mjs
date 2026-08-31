@@ -170,8 +170,10 @@ const conventionNames = [...conventionsBlock.code.matchAll(/\b(?:const|let|decla
 
 // --- classify ----------------------------------------------------------------
 
+// Every locale has its own conventions partial, and they are preambles rather
+// than pages: checking one against itself would just report duplicates.
 const files = [...markdownFiles(join(ROOT, "docs")), join(ROOT, "README.md")].filter(
-  (f) => f !== join(ROOT, CONVENTIONS),
+  (f) => !f.endsWith("_conventions.md"),
 );
 
 const units = []; // { virtualName, file, startLine, code }

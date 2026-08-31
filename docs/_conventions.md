@@ -1,21 +1,21 @@
-::: details Conventions des exemples de cette page
+::: details Conventions used by the examples on this page
 
-Pour ne pas répéter la même amorce partout, les exemples qui suivent supposent ce décor.
-Chaque bloc ne montre donc que ce qu'il démontre.
+So the same preamble is not repeated everywhere, the examples below assume this
+setting. Each block then shows only what it is demonstrating.
 
 ```ts
 import { loadReqIfPackage, ReqIfIndex } from "reqif-preview";
 
-// Les octets de votre fichier .reqif ou .reqifz.
-// Voir [Démarrage](/guide/demarrage) pour les obtenir depuis un <input type="file">,
-// depuis Node ou depuis une URL.
+// The bytes of your .reqif or .reqifz file.
+// See [Getting started](/guide/getting-started) for reading them from an
+// <input type="file">, from Node, or from a URL.
 declare const bytes: Uint8Array;
 
 const pkg = await loadReqIfPackage(bytes);
-const doc = pkg.document; // le premier document du paquet
+const doc = pkg.document; // the first document in the package
 
-// pkg.documents, pas pkg.document : c'est ce qui résout les relations qui
-// traversent la frontière entre deux .reqif d'un même .reqifz.
+// pkg.documents, not pkg.document: this is what resolves relations that cross
+// the boundary between two .reqif files inside one .reqifz.
 const index = new ReqIfIndex(pkg.documents);
 
 const spec = doc.coreContent.specifications[0];

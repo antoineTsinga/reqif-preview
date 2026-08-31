@@ -1,6 +1,6 @@
 /**
  * Fails the docs build if a symbol exported by `src/index.ts` is documented
- * nowhere under `docs/api/`.
+ * nowhere in any locale's API reference.
  *
  * The only thing that reliably keeps documentation from drifting is a check
  * that breaks the build. A README paragraph asking future maintainers to
@@ -10,14 +10,18 @@
  * regex, so `export * from "./types.js"` is expanded exactly the way a consumer
  * of the package sees it — types included, which are the bulk of the surface.
  *
+ * A symbol documented in any one locale counts. The check is that the public
+ * surface is described somewhere a reader can reach, not that every
+ * translation is finished — that would block adding a language.
+ *
  *   node scripts/check-docs.mjs
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 
 const ENTRY = "src/index.ts";
-const API_DIR = "docs/api";
+const DOCS_DIR = "docs";
 
 /** Every name `import * as x from "reqif-preview"` would expose. */
 function publicExports(entry) {
@@ -38,15 +42,37 @@ function publicExports(entry) {
     .sort();
 }
 
-function apiProse() {
-  return readdirSync(API_DIR)
-    .filter((f) => f.endsWith(".md"))
-    .map((f) => readFileSync(join(API_DIR, f), "utf8"))
+/** Every `api/` directory under docs/, one per locale that has one. */
+function apiDirs(dir, out = []) {
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry === ".vitepress" || entry === "public") continue;
+    const path = join(dir, entry);
+    if (!statSync(path).isDirectory()) continue;
+    if (entry === "api") out.push(path);
+    else apiDirs(path, out);
+  }
+  return out;
+}
+
+function apiProse(dirs) {
+  return dirs
+    .flatMap((d) =>
+      readdirSync(d)
+        .filter((f) => f.endsWith(".md"))
+        .map((f) => join(d, f)),
+    )
+    .map((f) => readFileSync(f, "utf8"))
     .join("\n");
 }
 
+const dirs = apiDirs(DOCS_DIR);
+if (dirs.length === 0) {
+  console.error(`\nAucune référence API trouvée sous ${DOCS_DIR}/.`);
+  process.exit(1);
+}
+
 const exported = publicExports(ENTRY);
-const prose = apiProse();
+const prose = apiProse(dirs);
 
 // Word-boundary match: `RenderOptions` must not be satisfied by a stray
 // mention of `RenderOptionsFoo`, and `escapeHtml` must not be satisfied by
@@ -55,7 +81,7 @@ const missing = exported.filter((name) => !new RegExp(`\\b${name}\\b`).test(pros
 
 if (missing.length > 0) {
   console.error(
-    `\n${missing.length} export(s) de ${ENTRY} ne sont documentés nulle part dans ${API_DIR}/ :\n`,
+    `\n${missing.length} export(s) de ${ENTRY} ne sont documentés dans aucune référence API :\n`,
   );
   for (const name of missing) console.error(`  - ${name}`);
   console.error(
@@ -65,4 +91,7 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-console.log(`check-docs : ${exported.length} exports publics, tous documentés dans ${API_DIR}/.`);
+console.log(
+  `check-docs : ${exported.length} exports publics, tous documentés` +
+    ` (${dirs.length} référence(s) API : ${dirs.join(", ")}).`,
+);

@@ -1,11 +1,11 @@
-# Liens entre exigences (`SpecRelation`)
+# Links between requirements (`SpecRelation`)
 
 <!--@include: ../_conventions.md-->
 
-Les liens typés entre exigences — « dérive de », « satisfait », « trace vers » — sont
-affichés automatiquement pour chaque objet qui en possède : ses liens **sortants** (`→`)
-et **entrants** (`←`), avec le nom du type de relation et un lien d'ancrage vers l'objet
-lié **si celui-ci est rendu dans la même page**.
+Typed links between requirements — "derives from", "satisfies", "traces to" — are shown
+automatically for every object that has any: its **outgoing** (`→`) and **incoming** (`←`)
+links, with the relation type's name and an anchor link to the linked object **when that
+object is rendered in the same page**.
 
 ```html
 <div class="reqif-relations">
@@ -17,75 +17,75 @@ lié **si celui-ci est rendu dans la même page**.
 </div>
 ```
 
-Si l'objet lié n'est pas trouvé, le libellé s'affiche quand même, sans lien cliquable, et
-l'événement `unresolved-reference` est émis ([diagnostics](/guide/diagnostics)).
+When the linked object is not found, the label is still shown, without a clickable link,
+and an `unresolved-reference` event is emitted ([diagnostics](/guide/diagnostics)).
 
-C'est visible par défaut, y compris en `readingMode` :
+This is visible by default, `readingMode` included:
 
 ```ts
-const html = await renderPackageToHtml(pkg, { showRelations: false }); // pour le masquer
+const html = await renderPackageToHtml(pkg, { showRelations: false }); // to hide it
 ```
 
-## Relations entre documents d'un même `.reqifz`
+## Relations between documents of one `.reqifz`
 
-**Elles se résolvent.** La spec type `SOURCE` et `TARGET` d'une `SpecRelation` en
-`GLOBAL-REF` (clause 11, règle 5b), c'est-à-dire qu'une relation peut légalement viser un
-objet d'un *autre* `.reqif` du paquet — c'est même le scénario d'échange canonique :
-exigences client d'un côté, exigences système de l'autre, reliées par « dérive de ».
+**They resolve.** The spec types a `SpecRelation`'s `SOURCE` and `TARGET` as `GLOBAL-REF`
+(clause 11, rule 5b), meaning a relation may legitimately target an object in *another*
+`.reqif` of the package — that is in fact the canonical exchange scenario: customer
+requirements on one side, system requirements on the other, tied together by "derives
+from".
 
-`renderPackageToHtml` construit donc **un index unique couvrant tous les documents**.
+`renderPackageToHtml` therefore builds **a single index covering every document**.
 
-Si vous appelez `renderDocumentToHtml` document par document, chacun n'est indexé que sur
-lui-même, et les relations qui traversent la frontière ne résolvent plus. Passez votre
-propre index partagé en 4ᵉ argument pour retrouver le même comportement :
+If you call `renderDocumentToHtml` document by document, each is indexed against itself
+alone, and relations crossing the boundary stop resolving. Pass your own shared index as
+the 4th argument to get the same behaviour back:
 
 ```ts
 const options: RenderOptions = { layout: "tabs" };
-const index = new ReqIfIndex(pkg.documents); // et non pkg.document
+const index = new ReqIfIndex(pkg.documents); // and not pkg.document
 const html = await renderDocumentToHtml(doc, pkg.attachments, options, index);
 ```
 
-::: warning `pkg.documents`, pas `pkg.document`
-`pkg.document` est un accesseur de confort pour le cas mono-document ; il ne renvoie que
-le premier. Passer celui-là au constructeur reconstruit exactement l'index partiel qu'on
-cherchait à éviter.
+::: warning `pkg.documents`, not `pkg.document`
+`pkg.document` is a convenience accessor for the single-document case; it returns only the
+first one. Passing that to the constructor rebuilds exactly the partial index you were
+trying to avoid.
 :::
 
-## Objets rendus plusieurs fois
+## Objects rendered more than once
 
-Un même `SpecObject` peut légalement apparaître à plusieurs endroits d'une arborescence —
-une exigence transverse citée sous deux chapitres, par exemple.
+One `SpecObject` may legitimately appear at several places in a tree — a cross-cutting
+requirement cited under two chapters, for instance.
 
-Seule **la première occurrence porte l'`id`** d'ancrage. C'est déjà ce que fait un
-navigateur en résolvant un fragment : émettre le même `id` plusieurs fois produit un HTML
-invalide **sans** rendre les autres occurrences atteignables pour autant. Chaque doublon
-émet un événement `duplicate-dom-id`.
+Only **the first occurrence carries the anchor `id`**. That is already what a browser does
+when resolving a fragment: emitting the same `id` several times produces invalid HTML
+**without** making the other occurrences reachable anyway. Each duplicate emits a
+`duplicate-dom-id` event.
 
-Conséquence pratique : un lien de relation vers un objet dupliqué mène toujours à sa
-première apparition dans l'ordre du document. C'est déterministe et stable entre deux
-rendus.
+The practical consequence: a relation link to a duplicated object always leads to its
+first appearance in document order. That is deterministic and stable between renders.
 
-## Ancres : la forme des identifiants
+## Anchors: the shape of the identifiers
 
-| Élément | `id` émis |
+| Element | `id` emitted |
 |---|---|
-| Document (onglet) | `reqif-doc-<identifiant du header>` |
-| Spécification (onglet) | `reqif-spec-<identifiant de la Specification>` |
-| Objet | `reqif-obj-<identifiant du SpecObject>` |
+| Document (tab) | `reqif-doc-<header identifier>` |
+| Specification (tab) | `reqif-spec-<Specification identifier>` |
+| Object | `reqif-obj-<SpecObject identifier>` |
 
-Ils dérivent tous de l'identifiant ReqIF, jamais d'un compteur de position : un lien
-partagé survit à l'insertion d'un élément avant sa cible.
+All of them derive from the ReqIF identifier, never from a positional counter: a shared
+link survives an element being inserted before its target.
 
-::: warning Un routeur SPA peut neutraliser ces liens
-Les liens de relation sont de simples `<a href="#…">`, comme les onglets. Un framework qui
-intercepte les clics internes et fait `history.pushState` laisse `:target` inchangé : le
-lien ne rouvrira pas l'onglet contenant sa cible. Le mécanisme et les remèdes sont détaillés
-dans [Onglets, numérotation, lecture](/guide/mise-en-page#un-routeur-spa-qui-intercepte-les-liens-casse-les-onglets).
+::: warning An SPA router can neutralise these links
+Relation links are plain `<a href="#…">`, like the tabs. A framework that intercepts
+in-page clicks and calls `history.pushState` leaves `:target` untouched: the link will not
+reopen the tab containing its target. The mechanism and the remedies are detailed in
+[Tabs, numbering, reading view](/guide/layout#an-spa-router-that-intercepts-links-breaks-the-tabs).
 :::
 
-## Limite actuelle
+## Current limitation
 
-Seules les `SpecRelation` — liens objet-à-objet — sont affichées. Les `RelationGroup`,
-qui regroupent des relations entre deux `Specification`, sont **parsées**
-(`doc.coreContent.specRelationGroups`) mais pas encore rendues. Elles restent exploitables
-directement via le [modèle de données](/guide/rendu-maison) si vous en avez besoin.
+Only `SpecRelation` — object-to-object links — are shown. `RelationGroup`, which groups
+relations between two `Specification`s, is **parsed**
+(`doc.coreContent.specRelationGroups`) but not yet rendered. It stays usable directly
+through the [data model](/guide/your-own-rendering) if you need it.

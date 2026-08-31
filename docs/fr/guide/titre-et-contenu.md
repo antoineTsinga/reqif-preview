@@ -42,7 +42,7 @@ filtré. Ces options décident de ce qui est **mis en avant**, pas de ce qui est
 
 ## Titre ou contenu vide volontaire
 
-Pour les objets « chapitres » (voir [`chapterNumberAttributes`](/guide/mise-en-page#chapternumbers)),
+Pour les objets « chapitres » (voir [`chapterNumberAttributes`](/fr/guide/mise-en-page#chapternumbers)),
 un raccourci existe :
 
 ```ts

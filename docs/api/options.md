@@ -1,59 +1,59 @@
-# Options de rendu
+# Render options
 
 <!--@include: ../_conventions.md-->
 
 ## `RenderOptions`
 
-Le même objet est accepté par `renderPackageToHtml`, `renderDocumentToHtml` et
-`renderSpecification`. Toutes les propriétés sont facultatives.
+The same object is accepted by `renderPackageToHtml`, `renderDocumentToHtml` and
+`renderSpecification`. Every property is optional.
 
-### Présentation
+### Presentation
 
-| Option | Type | Défaut | Effet |
+| Option | Type | Default | Effect |
 |---|---|---|---|
-| `includeCss` | `boolean` | `true` | Inclut la feuille de style par défaut dans un `<style>` en tête de la sortie. Si `false`, chargez-la via `reqif-preview/style.css` ou l'export `DEFAULT_CSS` — voir [Feuille de style](/api/#feuille-de-style). |
-| `layout` | `"stacked" \| "tabs"` | `"stacked"` | Onglets CSS entre documents et entre spécifications. Sans effet s'il n'y en a qu'un. [Détails](/guide/mise-en-page) |
-| `readingMode` | `boolean` | `false` | Vue de lecture : masque ID, créé/modifié et panneau technique ; titres en `<h3>`…`<h6>`. |
-| `chapterNumbers` | `boolean` | `false` | Préfixe les titres de `1`, `1.1`, `1.1.1`… en repartant à 1 par `Specification`. |
-| `chapterNumberAttributes` | `string[]` | — | Ne numérote que les nœuds portant l'un de ces attributs. Sans effet sans `chapterNumbers`. |
-| `labels` | `Partial<RenderLabels>` | français | Remplace les libellés d'interface. |
-| `dateLocale` | `string` | `"fr-FR"` | Locale de formatage des dates créé/modifié. |
+| `includeCss` | `boolean` | `true` | Includes the default stylesheet in a `<style>` at the top of the output. If `false`, load it through `reqif-preview/style.css` or the `DEFAULT_CSS` export — see [Stylesheet](/api/#stylesheet). |
+| `layout` | `"stacked" \| "tabs"` | `"stacked"` | CSS tabs between documents and between specifications. No effect when there is only one. [Details](/guide/layout) |
+| `readingMode` | `boolean` | `false` | Reading view: hides ID, created/modified and the technical panel; titles as `<h3>`…`<h6>`. |
+| `chapterNumbers` | `boolean` | `false` | Prefixes titles with `1`, `1.1`, `1.1.1`…, restarting at 1 per `Specification`. |
+| `chapterNumberAttributes` | `string[]` | — | Numbers only nodes carrying one of these attributes. No effect without `chapterNumbers`. |
+| `labels` | `Partial<RenderLabels>` | French | Replaces the interface labels. |
+| `dateLocale` | `string` | `"fr-FR"` | Locale used to format the created/modified dates. |
 
-### Contenu
+### Content
 
-| Option | Type | Défaut | Effet |
+| Option | Type | Default | Effect |
 |---|---|---|---|
-| `contentAttributes` | `string[]` | — | Liste blanche stricte des attributs formant le contenu principal, dans cet ordre. [Détails](/guide/titre-et-contenu) |
-| `titleAttributes` | `string[]` | — | Attributs essayés comme titre **en dernier recours**, après les `LONG-NAME`. |
-| `showTechnicalByDefault` | `boolean` | `false` | Ouvre le panneau « Détails techniques » d'entrée. |
-| `hideEmptyAttributes` | `boolean` | `true` | Omet du panneau technique les attributs sans aucune valeur. |
-| `preferSimplifiedXhtml` | `boolean` | `false` | Affiche la version simplifiée plutôt que l'original. [Détails](/guide/texte-simplifie) |
-| `showRelations` | `boolean` | `true` | Affiche les liens entrants/sortants. Visible aussi en `readingMode`. |
-| `customAttributeRenderers` | `CustomAttributeRenderer[]` | — | Injecte votre propre HTML avant/après le contenu. |
+| `contentAttributes` | `string[]` | — | Strict allow-list of the attributes making up the main content, in this order. [Details](/guide/title-and-content) |
+| `titleAttributes` | `string[]` | — | Attributes tried as a title **as a last resort**, after the `LONG-NAME`s. |
+| `showTechnicalByDefault` | `boolean` | `false` | Opens the "Technical details" panel from the start. |
+| `hideEmptyAttributes` | `boolean` | `true` | Omits attributes with no value at all from the technical panel. |
+| `preferSimplifiedXhtml` | `boolean` | `false` | Shows the simplified version rather than the original. [Details](/guide/simplified-text) |
+| `showRelations` | `boolean` | `true` | Shows incoming/outgoing links. Visible in `readingMode` too. |
+| `customAttributeRenderers` | `CustomAttributeRenderer[]` | — | Injects HTML of your own before/after the content. |
 
-### Placeholders « (sans titre) » / « (vide) »
+### The "(untitled)" / "(empty)" placeholders
 
-| Option | Type | Effet |
+| Option | Type | Effect |
 |---|---|---|
-| `suppressEmptyPlaceholdersForChapters` | `boolean` | Raccourci pour les objets « chapitres ». Sans effet sans `chapterNumberAttributes`. |
-| `isTitleless` | `(obj, specType, index) => boolean` | Décide, par vos critères, qu'un titre vide est normal pour cet objet. |
-| `isContentless` | `(obj, specType, index) => boolean` | Idem pour un contenu vide. Indépendant du précédent. |
+| `suppressEmptyPlaceholdersForChapters` | `boolean` | A shortcut for "chapter" objects. No effect without `chapterNumberAttributes`. |
+| `isTitleless` | `(obj, specType, index) => boolean` | Decides, by your own criteria, that an empty title is normal for this object. |
+| `isContentless` | `(obj, specType, index) => boolean` | The same for empty content. Independent of the previous one. |
 
-Les trois se composent : la suppression a lieu si **l'un** dit oui.
-Voir [Titre et contenu affichés](/guide/titre-et-contenu#titre-ou-contenu-vide-volontaire).
+The three compose: the placeholder is suppressed if **any** says yes.
+See [Choosing exactly which title and content are shown](/guide/title-and-content#deliberately-empty-title-or-content).
 
-### Pièces jointes et diagnostics
+### Attachments and diagnostics
 
-| Option | Type | Défaut | Effet |
+| Option | Type | Default | Effect |
 |---|---|---|---|
-| `attachments` | `AttachmentResolver` | celui du paquet | Remplace le résolveur. [Détails](/guide/pieces-jointes) |
-| `maxInlineBytes` | `number` | `5 * 1024 * 1024` | Taille maximale intégrée en `data:` URI, par fichier. |
-| `onDegradation` | `DegradationHandler` | — | Observe tout ce que le rendu dégrade silencieusement. [Détails](/api/diagnostics) |
+| `attachments` | `AttachmentResolver` | the package's | Replaces the resolver. [Details](/guide/attachments) |
+| `maxInlineBytes` | `number` | `5 * 1024 * 1024` | Maximum size inlined as a `data:` URI, per file. |
+| `onDegradation` | `DegradationHandler` | — | Observes everything the render silently degrades. [Details](/api/diagnostics) |
 
 ## `RenderLabels`
 
-Tous les libellés d'interface, en français par défaut. `labels` accepte un objet **partiel**
-— seuls les libellés fournis sont remplacés.
+Every interface label, French by default. `labels` accepts a **partial** object — only the
+labels you supply are replaced.
 
 ```ts
 interface RenderLabels {
@@ -78,7 +78,7 @@ interface RenderLabels {
 }
 ```
 
-::: tip Traduire l'interface complète
+::: tip Translating the whole interface
 ```ts
 const html = await renderPackageToHtml(pkg, {
   dateLocale: "en-US",
@@ -94,21 +94,21 @@ const html = await renderPackageToHtml(pkg, {
 
 ```ts
 interface CustomAttributeRenderer {
-  attribute: string;                    // nom long (insensible casse/espaces) ou identifiant
-  position?: "before" | "after";        // défaut : "before"
+  attribute: string;                    // long name (case/space-insensitive) or identifier
+  position?: "before" | "after";        // default: "before"
   render(value: AttributeValue | undefined, ctx: AttributeRenderContext): string | undefined;
-  hideFromTechnical?: boolean;          // défaut : false
+  hideFromTechnical?: boolean;          // default: false
 }
 ```
 
-Le HTML retourné est inséré **tel quel** — c'est du code que vous écrivez, pas du contenu
-de document, donc il n'est pas assaini. Échappez le texte interpolé avec
-[`escapeHtml`](/api/rendu#escapehtml).
+The HTML you return is inserted **as-is** — it is code you wrote, not document content, so
+it is not sanitised. Escape interpolated text with
+[`escapeHtml`](/api/rendering#escapehtml).
 
-Deux filets de sécurité : une exception dans `render()` est interceptée
-(`custom-renderer-threw`), et un HTML aux balises mal fermées est affiché en texte échappé
-(`custom-renderer-unbalanced-html`) plutôt que de casser la structure de tout ce qui suit.
-Voir [Rendus personnalisés](/guide/rendus-personnalises).
+Two safety nets: an exception inside `render()` is caught (`custom-renderer-threw`), and
+HTML with unbalanced tags is shown as escaped text (`custom-renderer-unbalanced-html`)
+rather than breaking the structure of everything that follows. See
+[Custom renderers](/guide/custom-renderers).
 
 ## `AttributeRenderContext`
 
@@ -125,7 +125,6 @@ interface AttributeRenderContext {
 }
 ```
 
-`formatValue` réutilise exactement le formatage du panneau technique : libellés
-d'énumération résolus, XHTML assaini, booléens selon `labels.yes`/`labels.no`. C'est le
-moyen le plus court d'afficher une valeur « comme la bibliothèque le ferait » sans
-réimplémenter la logique de type.
+`formatValue` reuses exactly the technical panel's formatting: enumeration labels
+resolved, XHTML sanitised, booleans following `labels.yes`/`labels.no`. It is the shortest
+way to display a value "as the library would" without reimplementing the type logic.
