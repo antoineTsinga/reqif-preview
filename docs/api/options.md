@@ -16,8 +16,8 @@ The same object is accepted by `renderPackageToHtml`, `renderDocumentToHtml` and
 | `readingMode` | `boolean` | `false` | Reading view: hides ID, created/modified and the technical panel; titles as `<h3>`…`<h6>`. |
 | `chapterNumbers` | `boolean` | `false` | Prefixes titles with `1`, `1.1`, `1.1.1`…, restarting at 1 per `Specification`. |
 | `chapterNumberAttributes` | `string[]` | — | Numbers only nodes carrying one of these attributes. No effect without `chapterNumbers`. |
-| `labels` | `Partial<RenderLabels>` | French | Replaces the interface labels. |
-| `dateLocale` | `string` | `"fr-FR"` | Locale used to format the created/modified dates. |
+| `labels` | `Partial<RenderLabels>` | English | Replaces the interface labels. |
+| `dateLocale` | `string` | `"en-GB"` | Locale used to format the created/modified dates. |
 
 ### Content
 
@@ -52,7 +52,7 @@ See [Choosing exactly which title and content are shown](/guide/title-and-conten
 
 ## `RenderLabels`
 
-Every interface label, French by default. `labels` accepts a **partial** object — only the
+Every interface label, English by default. `labels` accepts a **partial** object — only the
 labels you supply are replaced.
 
 ```ts
@@ -78,17 +78,25 @@ interface RenderLabels {
 }
 ```
 
-::: tip Translating the whole interface
+## `FRENCH_LABELS`
+
 ```ts
+const FRENCH_LABELS: RenderLabels;
+```
+
+The complete set this library shipped as its default until 0.2.0, so the previous
+rendering is one line away rather than eighteen:
+
+```ts
+import { FRENCH_LABELS } from "reqif-preview";
+
 const html = await renderPackageToHtml(pkg, {
-  dateLocale: "en-US",
-  labels: {
-    noContent: "(empty)", untitled: "(untitled)", technicalDetails: "Technical details",
-    yes: "Yes", no: "No", relationsLabel: "Links",
-  },
+  labels: FRENCH_LABELS,
+  dateLocale: "fr-FR",
 });
 ```
-:::
+
+Any other language is the same shape — `labels` is partial, so supply only what you need.
 
 ## `CustomAttributeRenderer`
 

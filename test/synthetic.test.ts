@@ -13,6 +13,7 @@ import {
   valueToPlainText,
   createAttachmentLookup,
   type DegradationEvent,
+  FRENCH_LABELS,
 } from "../src/index.js";
 import { SYNTHETIC_REQIF, TINY_PNG_BASE64 } from "./fixtures.js";
 
@@ -85,7 +86,7 @@ describe("synthetic fixture: simple mode vs technical details", () => {
     const html = await renderPackageToHtml(pkg, { includeCss: false });
     expect(html).toContain('<details class="reqif-technical">'); // no "open" attribute
     expect(html).not.toContain('<details class="reqif-technical" open>');
-    expect(html).toContain("Détails techniques");
+    expect(html).toContain("Technical details");
     // The technical attribute names (e.g. "Count", "Ratio") must still be present,
     // just nested inside the collapsed panel rather than shown unconditionally.
     expect(html).toContain("Count");
@@ -127,14 +128,28 @@ describe("synthetic fixture: ForeignID + created/modified UI", () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, { includeCss: false });
     expect(html).toContain('<div class="reqif-meta-strip">');
-    expect(html).toContain("Créé par");
+    expect(html).toContain("Created by");
     expect(html).toContain("<strong>Alice</strong>");
-    expect(html).toContain("Modifié par");
+    expect(html).toContain("Modified by");
     expect(html).toContain("<strong>Bob</strong>");
-    // dates are reformatted via Intl for display...
-    expect(html).toContain("10 janv. 2024");
+    // dates are reformatted via Intl for display — en-GB by default, which is
+    // unambiguous in a way neither en-US nor a bare numeric format would be...
+    expect(html).toContain("10 Jan 2024");
     // ...but the machine-readable ISO value is preserved in the <time> attribute
     expect(html).toContain('datetime="2024-01-10T09:00:00.000+01:00"');
+  });
+
+  it("restores the pre-0.2.0 French rendering in one line, via FRENCH_LABELS", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      labels: FRENCH_LABELS,
+      dateLocale: "fr-FR",
+    });
+    expect(html).toContain("Créé par");
+    expect(html).toContain("Détails techniques");
+    expect(html).toContain("10 janv. 2024");
+    expect(html).not.toContain("Created by");
   });
 
   it("still lists created/modified/foreignId attributes in the technical panel (never hidden)", async () => {
@@ -338,7 +353,7 @@ describe("synthetic fixture: contentAttributes (user-controlled content)", () =>
   it("falls back to the empty placeholder when none of the listed attributes are present", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, { includeCss: false, contentAttributes: ["Does not exist"] });
-    expect(html).toContain("(vide)");
+    expect(html).toContain("(empty)");
   });
 });
 
@@ -377,7 +392,7 @@ describe("synthetic fixture: titleAttributes (user-controlled title fallback)", 
       undefined,
       { includeCss: false, titleAttributes: ["Does not exist"] },
     );
-    expect(html).toContain("(sans titre)");
+    expect(html).toContain("(untitled)");
   });
 });
 
@@ -604,8 +619,8 @@ describe("synthetic fixture: readingMode (Word-like clean view)", () => {
     expect(html).not.toContain('class="reqif-id"');
     expect(html).not.toContain('class="reqif-meta-strip"');
     expect(html).not.toContain('class="reqif-technical"');
-    expect(html).not.toContain("Détails techniques");
-    expect(html).not.toContain("Créé par");
+    expect(html).not.toContain("Technical details");
+    expect(html).not.toContain("Created by");
   });
 
   it("still shows the title and the main content", async () => {
@@ -775,7 +790,7 @@ describe("synthetic fixture: spec relations (liaisons)", () => {
     const index = new ReqIfIndex(doc);
     const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {});
     expect(html).toContain("reqif-relation-unresolved");
-    expect(html).toContain("objet non trouvé");
+    expect(html).toContain("target not found");
   });
 });
 
@@ -810,7 +825,7 @@ describe("readingMode: heading sizes don't shrink illegibly with depth", () => {
 });
 
 describe("suppressEmptyPlaceholdersForChapters", () => {
-  it("by default still shows '(vide)'/'(sans titre)' even for chapter-qualifying objects", async () => {
+  it("by default still shows '(empty)'/'(untitled)' even for chapter-qualifying objects", async () => {
     const doc = parseReqIfXml(SYNTHETIC_REQIF);
     // so-1 has a ChapterName but also a LONG-NAME and content, so let's use a
     // bare chapter object with neither: strip so-3's title and give it no content.
@@ -819,8 +834,8 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
     const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
       chapterNumberAttributes: ["ChapterName"],
     });
-    expect(html).toContain("(sans titre)");
-    expect(html).toContain("(vide)");
+    expect(html).toContain("(untitled)");
+    expect(html).toContain("(empty)");
   });
 
   it("suppresses both placeholders for the chapter object itself, leaving non-chapter siblings unaffected", async () => {
@@ -834,12 +849,12 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
     // Isolate so-3's own node: no placeholder text, just an empty <summary> and no empty-content <p>.
     const so3Start = html.indexOf('id="reqif-obj-so-3"');
     const so3Block = html.slice(so3Start, html.indexOf("</details>", so3Start));
-    expect(so3Block).not.toContain("(sans titre)");
-    expect(so3Block).not.toContain("(vide)");
-    // so-2 (not a chapter: no ChapterName) keeps its own legitimate "(vide)".
+    expect(so3Block).not.toContain("(untitled)");
+    expect(so3Block).not.toContain("(empty)");
+    // so-2 (not a chapter: no ChapterName) keeps its own legitimate "(empty)".
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, so3Start);
-    expect(so2Block).toContain("(vide)");
+    expect(so2Block).toContain("(empty)");
   });
 
   it("still shows the placeholders for non-chapter objects, even with the option on", async () => {
@@ -853,7 +868,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
       chapterNumberAttributes: ["ChapterName"],
       suppressEmptyPlaceholdersForChapters: true,
     });
-    expect(html).toContain("(sans titre)"); // so-2 is not a chapter -> still flagged
+    expect(html).toContain("(untitled)"); // so-2 is not a chapter -> still flagged
   });
 
   it("has no effect without chapterNumberAttributes configured", async () => {
@@ -863,7 +878,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
     const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
       suppressEmptyPlaceholdersForChapters: true, // no chapterNumberAttributes -> isRealChapter always false
     });
-    expect(html).toContain("(sans titre)");
+    expect(html).toContain("(untitled)");
   });
 
   it("exposes isChapter on the customAttributeRenderers context for power users who want their own placeholder", async () => {
@@ -882,7 +897,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
 });
 
 describe("isTitleless / isContentless (general predicate, not tied to chapters)", () => {
-  it("suppresses '(sans titre)' for a plain paragraph object that has content but is never meant to have a title", async () => {
+  it("suppresses '(untitled)' for a plain paragraph object that has content but is never meant to have a title", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     // so-2 ("Child requirement") -> pretend it's untitled and give it body content to mimic
     // "a plain paragraph object that has text but no title", independent of any chapter concept.
@@ -894,7 +909,7 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     });
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
-    expect(so2Block).not.toContain("(sans titre)");
+    expect(so2Block).not.toContain("(untitled)");
     // its sibling so-1 is unaffected and keeps its real title
     expect(html).toContain(">Parent requirement<");
   });
@@ -908,8 +923,8 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     });
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
-    expect(so2Block).not.toContain("(sans titre)"); // title suppressed
-    expect(so2Block).toContain("(vide)"); // content placeholder still shown — different concern
+    expect(so2Block).not.toContain("(untitled)"); // title suppressed
+    expect(so2Block).toContain("(empty)"); // content placeholder still shown — different concern
   });
 
   it("can target objects by SpecObjectType rather than by identifier", async () => {
@@ -925,7 +940,7 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     expect(html).toContain(">Parent requirement<");
     // ...but so-2, which has none, no longer shows the placeholder
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
-    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(sans titre)");
+    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(untitled)");
   });
 
   it("composes with suppressEmptyPlaceholdersForChapters (either one suppressing is enough)", async () => {
@@ -938,10 +953,10 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
       isTitleless: (obj) => obj?.identifier === "so-2",
     });
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
-    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(sans titre)");
+    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(untitled)");
   });
 
-  it("isContentless independently suppresses '(vide)' without affecting the title", async () => {
+  it("isContentless independently suppresses '(empty)' without affecting the title", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       isContentless: (obj) => obj.identifier === "so-2",
@@ -949,7 +964,7 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
     expect(so2Block).toContain(">Child requirement<"); // title still shown normally
-    expect(so2Block).not.toContain("(vide)"); // content placeholder suppressed
+    expect(so2Block).not.toContain("(empty)"); // content placeholder suppressed
   });
 });
 
@@ -1199,14 +1214,14 @@ describe("cross-document SpecRelation (GLOBAL-REF, clause 11 rule 5b)", () => {
     // the unresolved label instead of an anchor.
     expect(html).toContain('href="#reqif-obj-obj-b"');
     expect(html).toContain("System requirement");
-    expect(html).not.toContain("(objet non trouvé)");
+    expect(html).not.toContain("(target not found)");
   });
 
   it("still falls back to a plain label when the target is nowhere in the package", async () => {
     const zipBytes = zipSync({ "a.reqif": strToU8(docWith("a", "obj-a", "Orphan source", "obj-missing")) });
     const pkg = await loadReqIfPackage(zipBytes);
     const html = await renderPackageToHtml(pkg, { includeCss: false });
-    expect(html).toContain("(objet non trouvé)");
+    expect(html).toContain("(target not found)");
   });
 
   it("keeps indexing a single document when called the old way", () => {

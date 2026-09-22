@@ -58,6 +58,33 @@ export interface RenderLabels {
 }
 
 const DEFAULT_LABELS: RenderLabels = {
+  noContent: "(empty)",
+  untitled: "(untitled)",
+  idLabel: "ID",
+  technicalDetails: "Technical details",
+  headerTitle: "Title",
+  headerSourceTool: "Source tool",
+  headerExportedBy: "Exported by",
+  headerCreationTime: "Creation date",
+  headerComment: "Comment",
+  yes: "Yes",
+  no: "No",
+  createdByLabel: "Created by",
+  createdOnLabel: "Created",
+  modifiedByLabel: "Modified by",
+  modifiedOnLabel: "Modified",
+  relationsLabel: "Links",
+  relationFallbackType: "Relation",
+  relationUnresolved: "(target not found)",
+};
+
+/**
+ * The labels this library shipped as its default until 0.2.0, kept so the
+ * previous rendering is one line away rather than eighteen:
+ *
+ *     renderPackageToHtml(pkg, { labels: FRENCH_LABELS, dateLocale: "fr-FR" })
+ */
+export const FRENCH_LABELS: RenderLabels = {
   noContent: "(vide)",
   untitled: "(sans titre)",
   idLabel: "ID",
@@ -561,7 +588,7 @@ function renderSpecObjectBody(
 ): string {
   const specType = index.specTypes.get(obj.typeRef);
   const lifecycle = extractLifecycleInfo(obj, index);
-  const dateLocale = options.dateLocale ?? "fr-FR";
+  const dateLocale = options.dateLocale ?? "en-GB";
 
   const simple = renderSimpleView(obj, specType, index, attachments, labels, options, lifecycle, dateLocale, isChapter, suppressContent);
   const technical = options.readingMode

@@ -70,30 +70,22 @@ whatever data type is declared, the text is extracted correctly.
 // Collapsed by default. To have it open from the start:
 const html = await renderPackageToHtml(pkg, { showTechnicalByDefault: true });
 
-// Locale used to format the created/modified dates (default "fr-FR"):
+// Locale used to format the created/modified dates (default "en-GB"):
 const html = await renderPackageToHtml(pkg, { dateLocale: "en-US" });
 ```
 
-::: warning Labels default to French
-The library ships French labels, because that is the language of the project it grew
-out of. English is one option away:
+Labels are English by default and every one of them is replaceable — `labels` is partial,
+so supply only what you want to change:
 
 ```ts
 const html = await renderPackageToHtml(pkg, {
-  dateLocale: "en-GB",
-  labels: {
-    technicalDetails: "Technical details",
-    noContent: "(empty)",
-    untitled: "(untitled)",
-    yes: "Yes",
-    no: "No",
-    relationsLabel: "Links",
-  },
+  labels: { technicalDetails: "Technische Details", yes: "Ja", no: "Nein" },
 });
 ```
 
-The complete list is in [`RenderLabels`](/api/options#renderlabels).
-:::
+The complete list is in [`RenderLabels`](/api/options#renderlabels). French, which this
+library shipped as its default until 0.2.0, is one line away through
+[`FRENCH_LABELS`](/api/options#french-labels).
 
 ## In the browser, from an `<input type="file">`
 

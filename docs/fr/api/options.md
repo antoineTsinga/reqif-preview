@@ -16,8 +16,8 @@ Le même objet est accepté par `renderPackageToHtml`, `renderDocumentToHtml` et
 | `readingMode` | `boolean` | `false` | Vue de lecture : masque ID, créé/modifié et panneau technique ; titres en `<h3>`…`<h6>`. |
 | `chapterNumbers` | `boolean` | `false` | Préfixe les titres de `1`, `1.1`, `1.1.1`… en repartant à 1 par `Specification`. |
 | `chapterNumberAttributes` | `string[]` | — | Ne numérote que les nœuds portant l'un de ces attributs. Sans effet sans `chapterNumbers`. |
-| `labels` | `Partial<RenderLabels>` | français | Remplace les libellés d'interface. |
-| `dateLocale` | `string` | `"fr-FR"` | Locale de formatage des dates créé/modifié. |
+| `labels` | `Partial<RenderLabels>` | anglais | Remplace les libellés d'interface. |
+| `dateLocale` | `string` | `"en-GB"` | Locale de formatage des dates créé/modifié. |
 
 ### Contenu
 
@@ -52,7 +52,7 @@ Voir [Titre et contenu affichés](/fr/guide/titre-et-contenu#titre-ou-contenu-vi
 
 ## `RenderLabels`
 
-Tous les libellés d'interface, en français par défaut. `labels` accepte un objet **partiel**
+Tous les libellés d'interface, en anglais par défaut. `labels` accepte un objet **partiel**
 — seuls les libellés fournis sont remplacés.
 
 ```ts
@@ -78,17 +78,26 @@ interface RenderLabels {
 }
 ```
 
-::: tip Traduire l'interface complète
+## `FRENCH_LABELS`
+
 ```ts
+const FRENCH_LABELS: RenderLabels;
+```
+
+Le jeu complet que la bibliothèque livrait par défaut jusqu'à la 0.2.0, pour que le rendu
+précédent soit à une ligne plutôt qu'à dix-huit :
+
+```ts
+import { FRENCH_LABELS } from "reqif-preview";
+
 const html = await renderPackageToHtml(pkg, {
-  dateLocale: "en-US",
-  labels: {
-    noContent: "(empty)", untitled: "(untitled)", technicalDetails: "Technical details",
-    yes: "Yes", no: "No", relationsLabel: "Links",
-  },
+  labels: FRENCH_LABELS,
+  dateLocale: "fr-FR",
 });
 ```
-:::
+
+Toute autre langue suit la même forme — `labels` est partiel, ne fournissez que ce qu'il
+vous faut.
 
 ## `CustomAttributeRenderer`
 

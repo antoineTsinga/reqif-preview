@@ -27,6 +27,7 @@ export {
   xhtmlToPlainText,
   escapeAttr,
   escapeHtml,
+  FRENCH_LABELS,
   type RenderOptions,
   type RenderLabels,
 } from "./render.js";
