@@ -1,10 +1,10 @@
 # reqif-preview
 
-Bibliothèque **indépendante de tout framework** pour parser et prévisualiser des fichiers **ReqIF** (`.reqif`) et **ReqIFZ** (`.reqifz`, l'archive zip avec pièces jointes), conforme à la spec OMG ReqIF v1.2 (formal/2016-07-01).
+**Framework-independent** library for parsing and previewing **ReqIF** (`.reqif`) and **ReqIFZ** (`.reqifz`, the zip archive carrying attachments) files, conformant to the OMG ReqIF v1.2 spec (formal/2016-07-01).
 
-Fonctionne aussi bien dans le navigateur (bundlé par Vite/Webpack/etc., ou via `<script type="module">`) que côté Node.js (SSR, CLI, traitement batch). Zéro dépendance à React/Vue/Angular — vous récupérez soit un **modèle de données typé**, soit du **HTML prêt à afficher** (`innerHTML`), et vous l'intégrez où vous voulez.
+Works in the browser (bundled by Vite/Webpack/etc., or through `<script type="module">`) as well as on Node.js (SSR, CLI, batch processing). No dependency on React/Vue/Angular — you get either a **typed data model** or **ready-to-display HTML** (`innerHTML`), and you put it wherever you like.
 
-📖 **[Documentation complète](https://reqif-preview.dev/)** — guide, référence API, et un [bac à sable](https://reqif-preview.dev/bac-a-sable) qui exécute la vraie bibliothèque sur *votre* fichier, dans votre navigateur.
+📖 **[Full documentation](https://reqif-preview.dev/)** — guide, API reference, and a [playground](https://reqif-preview.dev/playground) that runs the real library on *your* file, in your browser. Also available [in French](https://reqif-preview.dev/fr/).
 
 ## Installation
 
@@ -12,50 +12,49 @@ Fonctionne aussi bien dans le navigateur (bundlé par Vite/Webpack/etc., ou via 
 npm install reqif-preview
 ```
 
-## Démarrage rapide
+## Quick start
 
 ```ts
 import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
 
-// Les octets de votre fichier. Depuis une URL :
-const fileBytes = new Uint8Array(await (await fetch("/exigences.reqifz")).arrayBuffer());
-// Depuis un <input type="file">  : new Uint8Array(await file.arrayBuffer())
-// Depuis Node                    : await readFile("exigences.reqifz")
+// The bytes of your file. From a URL:
+const fileBytes = new Uint8Array(await (await fetch("/requirements.reqifz")).arrayBuffer());
+// From an <input type="file"> : new Uint8Array(await file.arrayBuffer())
+// From Node                   : await readFile("requirements.reqifz")
 
-// input : string XML brut, Uint8Array, ou ArrayBuffer (auto-détecte .reqif vs .reqifz)
+// input: raw XML string, Uint8Array, or ArrayBuffer (.reqif vs .reqifz is detected)
 const pkg = await loadReqIfPackage(fileBytes);
 
 const html = await renderPackageToHtml(pkg);
 document.getElementById("preview").innerHTML = html;
 ```
 
-C'est tout pour le cas simple : `loadReqIfPackage` détecte automatiquement si l'entrée est du XML brut (`.reqif`) ou une archive zip (`.reqifz`), extrait les pièces jointes, et `renderPackageToHtml` produit un bloc HTML autonome (avec son propre `<style>` scoping `.reqif-preview`) — arborescence des spécifications, texte enrichi (gras/italique/listes/tableaux), images intégrées en `data:` URI.
+That is all there is to the simple case: `loadReqIfPackage` works out on its own whether the input is raw XML (`.reqif`) or a zip archive (`.reqifz`), extracts the attachments, and `renderPackageToHtml` produces a self-contained block of HTML (with its own `<style>` scoping `.reqif-preview`) — the specification tree, rich text (bold/italic/lists/tables), images inlined as `data:` URIs.
 
-Pour voir le résultat sur **votre** fichier avant d'installer quoi que ce soit, le [bac à sable](https://reqif-preview.dev/bac-a-sable) exécute la bibliothèque dans votre navigateur — rien n'est envoyé nulle part. Et [`examples/browser.html`](https://github.com/antoineTsinga/reqif-preview/blob/main/examples/browser.html) est une page autonome, sans aucun framework ni outil de build.
+To see the result on **your** file before installing anything, the [playground](https://reqif-preview.dev/playground) runs the library in your browser — nothing is sent anywhere. And [`examples/browser.html`](https://github.com/antoineTsinga/reqif-preview/blob/main/examples/browser.html) is a standalone page, with no framework and no build step.
 
 ## Documentation
 
-Tout le reste vit sur le [site de documentation](https://reqif-preview.dev/) :
+Everything else lives on the [documentation site](https://reqif-preview.dev/):
 
 | | |
 |---|---|
-| [Démarrage](https://reqif-preview.dev/guide/demarrage) | installation, mode simple, navigateur et Node.js |
-| [Titre et contenu affichés](https://reqif-preview.dev/guide/titre-et-contenu) | `contentAttributes`, `titleAttributes`, placeholders |
-| [Texte simplifié](https://reqif-preview.dev/guide/texte-simplifie) | `isSimplified` et `THE-ORIGINAL-VALUE` |
-| [Rendus personnalisés](https://reqif-preview.dev/guide/rendus-personnalises) | `customAttributeRenderers`, filet HTML mal fermé |
-| [Onglets, numérotation, lecture](https://reqif-preview.dev/guide/mise-en-page) | `layout`, `chapterNumbers`, `readingMode` |
-| [Liens entre exigences](https://reqif-preview.dev/guide/relations) | `SpecRelation`, ancres, relations inter-documents |
-| [Pièces jointes](https://reqif-preview.dev/guide/pieces-jointes) | `.reqifz`, résolveur personnalisé |
-| [Documents très imbriqués](https://reqif-preview.dev/guide/gros-documents) | `maxNestedTags`, `processEntities` |
-| [Diagnostics](https://reqif-preview.dev/guide/diagnostics) | `onDegradation` et ses 14 codes |
-| [Sécurité](https://reqif-preview.dev/guide/securite) | liste blanche, `style`, schémas d'URL |
-| [Votre propre rendu](https://reqif-preview.dev/guide/rendu-maison) | le modèle typé, `ReqIfIndex`, les helpers |
-| [Référence API](https://reqif-preview.dev/api/) | tous les exports publics, un par un |
+| [Getting started](https://reqif-preview.dev/guide/getting-started) | installation, the default view, browser and Node.js |
+| [Title and content shown](https://reqif-preview.dev/guide/title-and-content) | `contentAttributes`, `titleAttributes`, placeholders |
+| [Simplified text](https://reqif-preview.dev/guide/simplified-text) | `isSimplified` and `THE-ORIGINAL-VALUE` |
+| [Custom renderers](https://reqif-preview.dev/guide/custom-renderers) | `customAttributeRenderers`, escaping and the escape hatch |
+| [Tabs, numbering, reading view](https://reqif-preview.dev/guide/layout) | `layout`, `chapterNumbers`, `readingMode` |
+| [Links between requirements](https://reqif-preview.dev/guide/relations) | `SpecRelation`, anchors, cross-document relations |
+| [Attachments](https://reqif-preview.dev/guide/attachments) | `.reqifz`, custom resolver |
+| [Deeply nested documents](https://reqif-preview.dev/guide/large-documents) | `maxNestedTags`, `processEntities` |
+| [Diagnostics](https://reqif-preview.dev/guide/diagnostics) | `onDegradation` and its 16 codes |
+| [Security](https://reqif-preview.dev/guide/security) | allowlist, `style`, URL schemes |
+| [Rendering it yourself](https://reqif-preview.dev/guide/your-own-rendering) | the typed model, `ReqIfIndex`, the helpers |
+| [API reference](https://reqif-preview.dev/api/) | every public export, one by one |
 
-## Contribuer
+## Contributing
 
-Les commandes de développement, le fonctionnement du site de documentation et la
-procédure de publication sont dans [CONTRIBUTING.md](https://github.com/antoineTsinga/reqif-preview/blob/main/CONTRIBUTING.md).
+Development commands, how the documentation site works and the release procedure are in [CONTRIBUTING.md](https://github.com/antoineTsinga/reqif-preview/blob/main/CONTRIBUTING.md).
 
 ## Licence
 
