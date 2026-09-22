@@ -18,6 +18,7 @@ export {
   renderSpecification,
   createAttachmentLookup,
   xhtmlToPlainText,
+  escapeAttr,
   escapeHtml,
   type RenderOptions,
   type RenderLabels,

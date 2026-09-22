@@ -1,6 +1,6 @@
 import { ReqIfIndex } from "./lookup.js";
 import { toBase64 } from "./base64.js";
-import { escapeHtml } from "./escape.js";
+import { escapeAttr, escapeHtml } from "./escape.js";
 import { DEFAULT_CSS } from "./styles.js";
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
@@ -313,11 +313,7 @@ export function renderSpecification(
 // Internals
 // ---------------------------------------------------------------------------
 
-export { escapeHtml } from "./escape.js";
-
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
-}
+export { escapeAttr, escapeHtml } from "./escape.js";
 
 /** Formats an ISO date/datetime for display; falls back to the raw string if it can't be parsed. */
 function formatDate(iso: string, locale: string, onDegradation?: DegradationHandler): string {

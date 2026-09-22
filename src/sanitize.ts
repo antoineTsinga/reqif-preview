@@ -1,4 +1,4 @@
-import { escapeHtml } from "./escape.js";
+import { escapeAttr, escapeHtml } from "./escape.js";
 import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import type { XhtmlContent, XhtmlElementNode, XhtmlNode } from "./types.js";
 
@@ -51,10 +51,6 @@ export interface XhtmlRenderOptions {
   attachments?: AttachmentLookup;
   /** Observes what the allowlist removes. See `diagnostics.ts`. */
   onDegradation?: DegradationHandler;
-}
-
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
 }
 
 function sanitizeHref(href: string | undefined, opts: XhtmlRenderOptions): string | undefined {
