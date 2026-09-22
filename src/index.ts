@@ -11,14 +11,23 @@ export { ReqIfIndex } from "./lookup.js";
 export type { DegradationCode, DegradationEvent, DegradationHandler } from "./diagnostics.js";
 export { resolveAttribute, normalizeKey, valueToPlainText } from "./attribute-lookup.js";
 export { extractLifecycleInfo, type LifecycleInfo } from "./lifecycle.js";
-export type { AttributeRenderContext, CustomAttributeRenderer } from "./custom-render.js";
+export type {
+  AttributeRenderContext,
+  CustomAttributeRenderer,
+  RenderElement,
+  RenderNode,
+  RenderOutput,
+  RenderRawHtml,
+} from "./custom-render.js";
 export {
   renderPackageToHtml,
   renderDocumentToHtml,
   renderSpecification,
   createAttachmentLookup,
   xhtmlToPlainText,
+  escapeAttr,
   escapeHtml,
+  FRENCH_LABELS,
   type RenderOptions,
   type RenderLabels,
 } from "./render.js";

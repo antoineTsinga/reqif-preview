@@ -13,6 +13,7 @@ import {
   valueToPlainText,
   createAttachmentLookup,
   type DegradationEvent,
+  FRENCH_LABELS,
 } from "../src/index.js";
 import { SYNTHETIC_REQIF, TINY_PNG_BASE64 } from "./fixtures.js";
 
@@ -85,7 +86,7 @@ describe("synthetic fixture: simple mode vs technical details", () => {
     const html = await renderPackageToHtml(pkg, { includeCss: false });
     expect(html).toContain('<details class="reqif-technical">'); // no "open" attribute
     expect(html).not.toContain('<details class="reqif-technical" open>');
-    expect(html).toContain("Détails techniques");
+    expect(html).toContain("Technical details");
     // The technical attribute names (e.g. "Count", "Ratio") must still be present,
     // just nested inside the collapsed panel rather than shown unconditionally.
     expect(html).toContain("Count");
@@ -127,14 +128,28 @@ describe("synthetic fixture: ForeignID + created/modified UI", () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, { includeCss: false });
     expect(html).toContain('<div class="reqif-meta-strip">');
-    expect(html).toContain("Créé par");
+    expect(html).toContain("Created by");
     expect(html).toContain("<strong>Alice</strong>");
-    expect(html).toContain("Modifié par");
+    expect(html).toContain("Modified by");
     expect(html).toContain("<strong>Bob</strong>");
-    // dates are reformatted via Intl for display...
-    expect(html).toContain("10 janv. 2024");
+    // dates are reformatted via Intl for display — en-GB by default, which is
+    // unambiguous in a way neither en-US nor a bare numeric format would be...
+    expect(html).toContain("10 Jan 2024");
     // ...but the machine-readable ISO value is preserved in the <time> attribute
     expect(html).toContain('datetime="2024-01-10T09:00:00.000+01:00"');
+  });
+
+  it("restores the pre-0.2.0 French rendering in one line, via FRENCH_LABELS", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      labels: FRENCH_LABELS,
+      dateLocale: "fr-FR",
+    });
+    expect(html).toContain("Créé par");
+    expect(html).toContain("Détails techniques");
+    expect(html).toContain("10 janv. 2024");
+    expect(html).not.toContain("Created by");
   });
 
   it("still lists created/modified/foreignId attributes in the technical panel (never hidden)", async () => {
@@ -221,7 +236,7 @@ describe("synthetic fixture: customAttributeRenderers", () => {
           position: "before",
           render: (value) =>
             value?.kind === "STRING" && value.value
-              ? `<span class="puid-badge">${value.value}</span>`
+              ? { tag: "span", attrs: { class: "puid-badge" }, children: [value.value] }
               : undefined,
         },
       ],
@@ -238,7 +253,7 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "ad-puid", position: "after", render: (v) => (v?.kind === "STRING" ? `<em>${v.value}</em>` : undefined) },
+        { attribute: "ad-puid", position: "after", render: (v) => (v?.kind === "STRING" ? { tag: "em", children: [v.value ?? ""] } : undefined) },
       ],
     });
     const emIndex = html.indexOf("<em>SRS-42</em>");
@@ -256,7 +271,8 @@ describe("synthetic fixture: customAttributeRenderers", () => {
           render: (_value, ctx) => {
             const name = ctx.getValue("Name");
             const formatted = ctx.formatValue(name);
-            return `<span class="cross-attr">${formatted}</span>`;
+            // formatValue renvoie du HTML déjà assaini, pas du texte.
+            return { tag: "span", attrs: { class: "cross-attr" }, children: [{ dangerouslyRawHtml: formatted }] };
           },
         },
       ],
@@ -268,13 +284,13 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const shown = await renderPackageToHtml(pkg, {
       includeCss: false,
-      customAttributeRenderers: [{ attribute: "IE PUID", render: () => "<b>x</b>" }],
+      customAttributeRenderers: [{ attribute: "IE PUID", render: () => ({ tag: "b", children: ["x"] }) }],
     });
     expect(shown).toContain("IE PUID");
 
     const hidden = await renderPackageToHtml(pkg, {
       includeCss: false,
-      customAttributeRenderers: [{ attribute: "IE PUID", hideFromTechnical: true, render: () => "<b>x</b>" }],
+      customAttributeRenderers: [{ attribute: "IE PUID", hideFromTechnical: true, render: () => ({ tag: "b", children: ["x"] }) }],
     });
     expect(hidden).not.toContain("IE PUID");
   });
@@ -300,7 +316,7 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v ? `<span class="puid-badge">${v.kind === "STRING" ? v.value : ""}</span>` : undefined) },
+        { attribute: "IE PUID", render: (v) => (v ? { tag: "span", attrs: { class: "puid-badge" }, children: [v.kind === "STRING" ? (v.value ?? "") : ""] } : undefined) },
       ],
     });
     // so-2 has no "IE PUID" value, so its badge must not appear at all near its block.
@@ -337,7 +353,7 @@ describe("synthetic fixture: contentAttributes (user-controlled content)", () =>
   it("falls back to the empty placeholder when none of the listed attributes are present", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, { includeCss: false, contentAttributes: ["Does not exist"] });
-    expect(html).toContain("(vide)");
+    expect(html).toContain("(empty)");
   });
 });
 
@@ -376,7 +392,7 @@ describe("synthetic fixture: titleAttributes (user-controlled title fallback)", 
       undefined,
       { includeCss: false, titleAttributes: ["Does not exist"] },
     );
-    expect(html).toContain("(sans titre)");
+    expect(html).toContain("(untitled)");
   });
 });
 
@@ -386,7 +402,7 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<div class="puid-badge">${v.value}` : undefined) }, // missing </div>
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<div class="puid-badge">${v.value}` } : undefined) }, // missing </div>
       ],
     });
     // the broken tag must be escaped, not inserted raw...
@@ -402,19 +418,19 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<span>${v.value}</span></span>` : undefined) }, // extra </span>
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<span>${v.value}</span></span>` } : undefined) }, // extra </span>
       ],
     });
     expect(html).toContain("&lt;span&gt;SRS-42&lt;/span&gt;&lt;/span&gt;");
     expect(html).toContain('<div class="reqif-content">');
   });
 
-  it("still inserts well-formed custom HTML as raw markup, unescaped", async () => {
+  it("still inserts well-formed dangerouslyRawHtml as raw markup, unescaped", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<span class="puid-badge">${v.value}</span>` : undefined) },
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<span class="puid-badge">${v.value}</span>` } : undefined) },
       ],
     });
     expect(html).toContain('<span class="puid-badge">SRS-42</span>');
@@ -427,13 +443,144 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
       customAttributeRenderers: [
         {
           attribute: "IE PUID",
-          render: () => `<table><tr><th>Champ</th><th>Valeur</th></tr><tr><td>PUID</td><td>SRS-42</td></tr>`, // missing </table>
+          render: () => ({ dangerouslyRawHtml: `<table><tr><th>Champ</th><th>Valeur</th></tr><tr><td>PUID</td><td>SRS-42</td></tr>` }), // missing </table>
         },
       ],
     });
     expect(html).toContain("&lt;table&gt;");
     expect(html).toContain('<div class="reqif-content">');
     expect(html).toContain('<details class="reqif-technical">');
+  });
+});
+
+describe("customAttributeRenderers: escaping is the default, raw markup is opt-in", () => {
+  // Well-formed on purpose: this is exactly what the balance check cannot see.
+  const PAYLOAD = `<img src=x onerror="alert(1)">`;
+
+  function collect() {
+    const events: DegradationEvent[] = [];
+    return { events, onDegradation: (e: DegradationEvent) => events.push(e) };
+  }
+  const codes = (events: DegradationEvent[]) => events.map((e) => e.code);
+
+  it("escapes document content used as a text child, rather than inserting it", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ({ tag: "span", children: [PAYLOAD] }) },
+      ],
+    });
+    expect(html).not.toContain(PAYLOAD);
+    expect(html).toContain("&lt;img src=x onerror=");
+  });
+
+  it("escapes the quotation mark that would break out of an attribute value", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => ({ tag: "span", attrs: { title: `x" onclick="alert(1)` }, children: ["ok"] }),
+        },
+      ],
+    });
+    expect(html).not.toContain(`onclick="alert(1)"`);
+    expect(html).toContain("&quot; onclick=&quot;alert(1)");
+  });
+
+  it("drops an attribute outside the allowlist and says so", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => ({ tag: "span", attrs: { onclick: "alert(1)", style: "position:fixed", class: "kept" }, children: ["x"] }),
+        },
+      ],
+    });
+    expect(html).not.toContain("onclick");
+    expect(html).not.toContain("position:fixed");
+    expect(html).toContain('class="kept"');
+    // Once per SpecObject, so count the distinct attribute names rather than the events.
+    const dropped = new Set(
+      events.filter((e) => e.code === "custom-renderer-dropped-attr").map((e) => e.detail?.attr),
+    );
+    expect([...dropped].sort()).toEqual(["onclick", "style"]);
+  });
+
+  it("neutralises a blocked URL scheme on href, through the same filter as document content", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => ({ tag: "a", attrs: { href: "javascript:alert(1)" }, children: ["cliquez"] }),
+        },
+      ],
+    });
+    expect(html).not.toContain("javascript:");
+    expect(html).toContain(">cliquez</a>"); // the label survives, only the href goes
+    expect(codes(events)).toContain("dropped-href");
+  });
+
+  it("unwraps a tag outside the allowlist, keeping its children", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ({ tag: "marquee", children: ["gardé"] }) },
+      ],
+    });
+    expect(html).not.toContain("<marquee");
+    expect(html).toContain("gardé");
+    expect(codes(events)).toContain("unwrapped-tag");
+  });
+
+  it("escapes a bare string returned from untyped JavaScript, and names the migration", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        // What a JS consumer still on the old API would return.
+        { attribute: "IE PUID", render: (() => PAYLOAD) as never },
+      ],
+    });
+    expect(html).not.toContain(PAYLOAD);
+    expect(codes(events)).toContain("custom-renderer-raw-string");
+  });
+
+  it("inserts dangerouslyRawHtml verbatim — the escape hatch still opens", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ({ dangerouslyRawHtml: `<span data-raw="1">brut</span>` }) },
+      ],
+    });
+    expect(html).toContain(`<span data-raw="1">brut</span>`);
+  });
+
+  it("accepts an array at the top level, mixing text and elements", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ["avant ", { tag: "code", children: ["SRS-42"] }] },
+      ],
+    });
+    expect(html).toContain("avant <code>SRS-42</code>");
   });
 });
 
@@ -472,8 +619,8 @@ describe("synthetic fixture: readingMode (Word-like clean view)", () => {
     expect(html).not.toContain('class="reqif-id"');
     expect(html).not.toContain('class="reqif-meta-strip"');
     expect(html).not.toContain('class="reqif-technical"');
-    expect(html).not.toContain("Détails techniques");
-    expect(html).not.toContain("Créé par");
+    expect(html).not.toContain("Technical details");
+    expect(html).not.toContain("Created by");
   });
 
   it("still shows the title and the main content", async () => {
@@ -488,7 +635,7 @@ describe("synthetic fixture: readingMode (Word-like clean view)", () => {
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       readingMode: true,
-      customAttributeRenderers: [{ attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<em>${v.value}</em>` : undefined) }],
+      customAttributeRenderers: [{ attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { tag: "em", children: [v.value ?? ""] } : undefined) }],
     });
     expect(html).toContain("<em>SRS-42</em>");
   });
@@ -643,7 +790,7 @@ describe("synthetic fixture: spec relations (liaisons)", () => {
     const index = new ReqIfIndex(doc);
     const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {});
     expect(html).toContain("reqif-relation-unresolved");
-    expect(html).toContain("objet non trouvé");
+    expect(html).toContain("target not found");
   });
 });
 
@@ -678,7 +825,7 @@ describe("readingMode: heading sizes don't shrink illegibly with depth", () => {
 });
 
 describe("suppressEmptyPlaceholdersForChapters", () => {
-  it("by default still shows '(vide)'/'(sans titre)' even for chapter-qualifying objects", async () => {
+  it("by default still shows '(empty)'/'(untitled)' even for chapter-qualifying objects", async () => {
     const doc = parseReqIfXml(SYNTHETIC_REQIF);
     // so-1 has a ChapterName but also a LONG-NAME and content, so let's use a
     // bare chapter object with neither: strip so-3's title and give it no content.
@@ -687,8 +834,8 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
     const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
       chapterNumberAttributes: ["ChapterName"],
     });
-    expect(html).toContain("(sans titre)");
-    expect(html).toContain("(vide)");
+    expect(html).toContain("(untitled)");
+    expect(html).toContain("(empty)");
   });
 
   it("suppresses both placeholders for the chapter object itself, leaving non-chapter siblings unaffected", async () => {
@@ -702,12 +849,12 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
     // Isolate so-3's own node: no placeholder text, just an empty <summary> and no empty-content <p>.
     const so3Start = html.indexOf('id="reqif-obj-so-3"');
     const so3Block = html.slice(so3Start, html.indexOf("</details>", so3Start));
-    expect(so3Block).not.toContain("(sans titre)");
-    expect(so3Block).not.toContain("(vide)");
-    // so-2 (not a chapter: no ChapterName) keeps its own legitimate "(vide)".
+    expect(so3Block).not.toContain("(untitled)");
+    expect(so3Block).not.toContain("(empty)");
+    // so-2 (not a chapter: no ChapterName) keeps its own legitimate "(empty)".
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, so3Start);
-    expect(so2Block).toContain("(vide)");
+    expect(so2Block).toContain("(empty)");
   });
 
   it("still shows the placeholders for non-chapter objects, even with the option on", async () => {
@@ -721,7 +868,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
       chapterNumberAttributes: ["ChapterName"],
       suppressEmptyPlaceholdersForChapters: true,
     });
-    expect(html).toContain("(sans titre)"); // so-2 is not a chapter -> still flagged
+    expect(html).toContain("(untitled)"); // so-2 is not a chapter -> still flagged
   });
 
   it("has no effect without chapterNumberAttributes configured", async () => {
@@ -731,7 +878,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
     const html = renderSpecification(doc.coreContent.specifications[0], index, { get: () => undefined }, undefined, {
       suppressEmptyPlaceholdersForChapters: true, // no chapterNumberAttributes -> isRealChapter always false
     });
-    expect(html).toContain("(sans titre)");
+    expect(html).toContain("(untitled)");
   });
 
   it("exposes isChapter on the customAttributeRenderers context for power users who want their own placeholder", async () => {
@@ -741,7 +888,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
       customAttributeRenderers: [
         {
           attribute: "ad-name", // arbitrary; we only care about ctx.isChapter here
-          render: (_v, ctx) => (ctx.isChapter ? `<em data-chapter-marker="1"></em>` : undefined),
+          render: (_v, ctx) => (ctx.isChapter ? { dangerouslyRawHtml: `<em data-chapter-marker="1"></em>` } : undefined),
         },
       ],
     });
@@ -750,7 +897,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
 });
 
 describe("isTitleless / isContentless (general predicate, not tied to chapters)", () => {
-  it("suppresses '(sans titre)' for a plain paragraph object that has content but is never meant to have a title", async () => {
+  it("suppresses '(untitled)' for a plain paragraph object that has content but is never meant to have a title", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     // so-2 ("Child requirement") -> pretend it's untitled and give it body content to mimic
     // "a plain paragraph object that has text but no title", independent of any chapter concept.
@@ -762,7 +909,7 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     });
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
-    expect(so2Block).not.toContain("(sans titre)");
+    expect(so2Block).not.toContain("(untitled)");
     // its sibling so-1 is unaffected and keeps its real title
     expect(html).toContain(">Parent requirement<");
   });
@@ -776,8 +923,8 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     });
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
-    expect(so2Block).not.toContain("(sans titre)"); // title suppressed
-    expect(so2Block).toContain("(vide)"); // content placeholder still shown — different concern
+    expect(so2Block).not.toContain("(untitled)"); // title suppressed
+    expect(so2Block).toContain("(empty)"); // content placeholder still shown — different concern
   });
 
   it("can target objects by SpecObjectType rather than by identifier", async () => {
@@ -793,7 +940,7 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     expect(html).toContain(">Parent requirement<");
     // ...but so-2, which has none, no longer shows the placeholder
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
-    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(sans titre)");
+    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(untitled)");
   });
 
   it("composes with suppressEmptyPlaceholdersForChapters (either one suppressing is enough)", async () => {
@@ -806,10 +953,10 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
       isTitleless: (obj) => obj?.identifier === "so-2",
     });
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
-    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(sans titre)");
+    expect(html.slice(so2Start, so2Start + 200)).not.toContain("(untitled)");
   });
 
-  it("isContentless independently suppresses '(vide)' without affecting the title", async () => {
+  it("isContentless independently suppresses '(empty)' without affecting the title", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       isContentless: (obj) => obj.identifier === "so-2",
@@ -817,7 +964,7 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
     const so2Start = html.indexOf('id="reqif-obj-so-2"');
     const so2Block = html.slice(so2Start, html.indexOf("reqif-node-children", so2Start));
     expect(so2Block).toContain(">Child requirement<"); // title still shown normally
-    expect(so2Block).not.toContain("(vide)"); // content placeholder suppressed
+    expect(so2Block).not.toContain("(empty)"); // content placeholder suppressed
   });
 });
 
@@ -1067,14 +1214,14 @@ describe("cross-document SpecRelation (GLOBAL-REF, clause 11 rule 5b)", () => {
     // the unresolved label instead of an anchor.
     expect(html).toContain('href="#reqif-obj-obj-b"');
     expect(html).toContain("System requirement");
-    expect(html).not.toContain("(objet non trouvé)");
+    expect(html).not.toContain("(target not found)");
   });
 
   it("still falls back to a plain label when the target is nowhere in the package", async () => {
     const zipBytes = zipSync({ "a.reqif": strToU8(docWith("a", "obj-a", "Orphan source", "obj-missing")) });
     const pkg = await loadReqIfPackage(zipBytes);
     const html = await renderPackageToHtml(pkg, { includeCss: false });
-    expect(html).toContain("(objet non trouvé)");
+    expect(html).toContain("(target not found)");
   });
 
   it("keeps indexing a single document when called the old way", () => {
@@ -1189,7 +1336,7 @@ describe("onDegradation: making the silent fallbacks observable", () => {
       onDegradation,
       customAttributeRenderers: [
         { attribute: "Name", render: () => { throw new Error("boom"); } },
-        { attribute: "Count", position: "after", render: () => "<div>never closed" },
+        { attribute: "Count", position: "after", render: () => ({ dangerouslyRawHtml: "<div>never closed" }) },
       ],
     });
     expect(codes(events)).toContain("custom-renderer-threw");

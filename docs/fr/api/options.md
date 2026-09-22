@@ -16,8 +16,8 @@ Le même objet est accepté par `renderPackageToHtml`, `renderDocumentToHtml` et
 | `readingMode` | `boolean` | `false` | Vue de lecture : masque ID, créé/modifié et panneau technique ; titres en `<h3>`…`<h6>`. |
 | `chapterNumbers` | `boolean` | `false` | Préfixe les titres de `1`, `1.1`, `1.1.1`… en repartant à 1 par `Specification`. |
 | `chapterNumberAttributes` | `string[]` | — | Ne numérote que les nœuds portant l'un de ces attributs. Sans effet sans `chapterNumbers`. |
-| `labels` | `Partial<RenderLabels>` | français | Remplace les libellés d'interface. |
-| `dateLocale` | `string` | `"fr-FR"` | Locale de formatage des dates créé/modifié. |
+| `labels` | `Partial<RenderLabels>` | anglais | Remplace les libellés d'interface. |
+| `dateLocale` | `string` | `"en-GB"` | Locale de formatage des dates créé/modifié. |
 
 ### Contenu
 
@@ -52,7 +52,7 @@ Voir [Titre et contenu affichés](/fr/guide/titre-et-contenu#titre-ou-contenu-vi
 
 ## `RenderLabels`
 
-Tous les libellés d'interface, en français par défaut. `labels` accepte un objet **partiel**
+Tous les libellés d'interface, en anglais par défaut. `labels` accepte un objet **partiel**
 — seuls les libellés fournis sont remplacés.
 
 ```ts
@@ -78,17 +78,26 @@ interface RenderLabels {
 }
 ```
 
-::: tip Traduire l'interface complète
+## `FRENCH_LABELS`
+
 ```ts
+const FRENCH_LABELS: RenderLabels;
+```
+
+Le jeu complet que la bibliothèque livrait par défaut jusqu'à la 0.2.0, pour que le rendu
+précédent soit à une ligne plutôt qu'à dix-huit :
+
+```ts
+import { FRENCH_LABELS } from "reqif-preview";
+
 const html = await renderPackageToHtml(pkg, {
-  dateLocale: "en-US",
-  labels: {
-    noContent: "(empty)", untitled: "(untitled)", technicalDetails: "Technical details",
-    yes: "Yes", no: "No", relationsLabel: "Links",
-  },
+  labels: FRENCH_LABELS,
+  dateLocale: "fr-FR",
 });
 ```
-:::
+
+Toute autre langue suit la même forme — `labels` est partiel, ne fournissez que ce qu'il
+vous faut.
 
 ## `CustomAttributeRenderer`
 
@@ -96,19 +105,47 @@ const html = await renderPackageToHtml(pkg, {
 interface CustomAttributeRenderer {
   attribute: string;                    // nom long (insensible casse/espaces) ou identifiant
   position?: "before" | "after";        // défaut : "before"
-  render(value: AttributeValue | undefined, ctx: AttributeRenderContext): string | undefined;
+  render(value: AttributeValue | undefined, ctx: AttributeRenderContext): RenderOutput;
   hideFromTechnical?: boolean;          // défaut : false
 }
 ```
 
-Le HTML retourné est inséré **tel quel** — c'est du code que vous écrivez, pas du contenu
-de document, donc il n'est pas assaini. Échappez le texte interpolé avec
-[`escapeHtml`](/fr/api/rendu#escapehtml).
-
 Deux filets de sécurité : une exception dans `render()` est interceptée
-(`custom-renderer-threw`), et un HTML aux balises mal fermées est affiché en texte échappé
-(`custom-renderer-unbalanced-html`) plutôt que de casser la structure de tout ce qui suit.
-Voir [Rendus personnalisés](/fr/guide/rendus-personnalises).
+(`custom-renderer-threw`), et un `dangerouslyRawHtml` mal fermé est affiché en texte
+échappé (`custom-renderer-unbalanced-html`) plutôt que de casser la structure de tout ce
+qui suit. Voir [Rendus personnalisés](/fr/guide/rendus-personnalises).
+
+## `RenderOutput`, `RenderNode`, `RenderElement`, `RenderRawHtml`
+
+Ce qu'un rendu retourne. Le texte est échappé par défaut ; le balisage brut se demande
+explicitement.
+
+```ts
+type RenderNode = string | RenderElement | RenderRawHtml;
+
+interface RenderElement {
+  tag: string;                      // liste blanche, sinon déballé (unwrapped-tag)
+  attrs?: Record<string, string>;   // liste blanche, valeurs échappées
+  children?: RenderNode[];          // une chaîne y est du texte
+}
+
+interface RenderRawHtml {
+  dangerouslyRawHtml: string;       // inséré tel quel — à vous de l'échapper
+}
+
+type RenderOutput = RenderElement | RenderRawHtml | RenderNode[] | undefined;
+```
+
+| | Autorisé |
+|---|---|
+| Balises | `span` `div` `p` `a` `code` `strong` `b` `em` `i` `small` `br` `img` `ul` `ol` `li` |
+| Attributs | `class` `id` `title` `lang` `dir`, plus `href` / `src` via le filtre de schéma d'URL |
+
+`style` est délibérément absent — la présentation va dans votre feuille de style. Une chaîne
+nue n'est **pas** acceptée au premier niveau : sous l'API précédente elle voulait dire du
+HTML brut, donc l'accepter changerait silencieusement ce que produisent les rendus
+existants. Depuis du JavaScript sans types, elle est échappée, avec
+`custom-renderer-raw-string`.
 
 ## `AttributeRenderContext`
 

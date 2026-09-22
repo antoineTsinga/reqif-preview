@@ -70,19 +70,26 @@ importe le type de donnée déclaré, le texte est extrait correctement.
 // Replié par défaut. Pour l'afficher déplié d'entrée :
 const html = await renderPackageToHtml(pkg, { showTechnicalByDefault: true });
 
-// Locale utilisée pour formater les dates créé/modifié (par défaut "fr-FR") :
+// Locale utilisée pour formater les dates créé/modifié (par défaut "en-GB") :
 const html = await renderPackageToHtml(pkg, { dateLocale: "en-US" });
 ```
 
-Les libellés sont en français par défaut et personnalisables :
+Les libellés sont **en anglais par défaut** — le paquet est publié sur npm, et c'est la
+langue de ses lecteurs. Ils sont tous remplaçables ; `labels` est partiel, ne fournissez
+que ce que vous voulez changer :
 
 ```ts
+import { FRENCH_LABELS } from "reqif-preview";
+
+// Le rendu français, celui livré par défaut jusqu'à la 0.2.0 :
 const html = await renderPackageToHtml(pkg, {
-  labels: { technicalDetails: "Technical details", yes: "Yes", no: "No" },
+  labels: FRENCH_LABELS,
+  dateLocale: "fr-FR",
 });
 ```
 
-La liste complète des libellés est dans [`RenderLabels`](/fr/api/options#renderlabels).
+La liste complète est dans [`RenderLabels`](/fr/api/options#renderlabels), et
+[`FRENCH_LABELS`](/fr/api/options#french-labels) porte le jeu complet.
 
 ## Dans le navigateur, depuis un `<input type="file">`
 

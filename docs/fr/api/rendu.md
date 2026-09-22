@@ -163,7 +163,9 @@ n'est conservée.
 function escapeHtml(s: string): string;
 ```
 
-Échappe `&`, `<`, `>` et les guillemets. Exporté parce que le HTML retourné par vos
+Échappe `&`, `<` et `>` — le texte destiné au **corps** d'un élément.
+
+Exporté parce que le HTML retourné par vos
 [`customAttributeRenderers`](/fr/api/options#customattributerenderer) **n'est pas assaini** :
 si vous y interpolez du texte venant du fichier, c'est à vous de l'échapper.
 
@@ -171,3 +173,26 @@ si vous y interpolez du texte venant du fichier, c'est à vous de l'échapper.
 import { escapeHtml } from "reqif-preview";
 render: (v) => `<span class="badge">${escapeHtml(v?.value ?? "")}</span>`;
 ```
+
+::: danger Insuffisant pour une valeur d'attribut
+`escapeHtml` **ne touche pas aux guillemets**. Dans
+`title="${escapeHtml(v)}"`, une valeur contenant `"` referme l'attribut et en ouvre un
+autre — un `onclick` par exemple. Pour un attribut, utilisez [`escapeAttr`](#escapeattr).
+:::
+
+## `escapeAttr`
+
+```ts
+function escapeAttr(s: string): string;
+```
+
+Tout ce que fait `escapeHtml`, **plus le guillemet** qui mettrait fin à l'attribut.
+
+```ts
+import { escapeAttr } from "reqif-preview";
+render: (v) => `<span title="${escapeAttr(v?.value ?? "")}">…</span>`;
+```
+
+Les deux existent séparément parce que les contextes diffèrent : un `"` dans du texte
+d'élément est inoffensif et l'échapper ne fait qu'alourdir le balisage, alors que le même
+caractère dans un attribut est toute l'attaque.

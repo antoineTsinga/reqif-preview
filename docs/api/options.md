@@ -16,8 +16,8 @@ The same object is accepted by `renderPackageToHtml`, `renderDocumentToHtml` and
 | `readingMode` | `boolean` | `false` | Reading view: hides ID, created/modified and the technical panel; titles as `<h3>`…`<h6>`. |
 | `chapterNumbers` | `boolean` | `false` | Prefixes titles with `1`, `1.1`, `1.1.1`…, restarting at 1 per `Specification`. |
 | `chapterNumberAttributes` | `string[]` | — | Numbers only nodes carrying one of these attributes. No effect without `chapterNumbers`. |
-| `labels` | `Partial<RenderLabels>` | French | Replaces the interface labels. |
-| `dateLocale` | `string` | `"fr-FR"` | Locale used to format the created/modified dates. |
+| `labels` | `Partial<RenderLabels>` | English | Replaces the interface labels. |
+| `dateLocale` | `string` | `"en-GB"` | Locale used to format the created/modified dates. |
 
 ### Content
 
@@ -52,7 +52,7 @@ See [Choosing exactly which title and content are shown](/guide/title-and-conten
 
 ## `RenderLabels`
 
-Every interface label, French by default. `labels` accepts a **partial** object — only the
+Every interface label, English by default. `labels` accepts a **partial** object — only the
 labels you supply are replaced.
 
 ```ts
@@ -78,17 +78,25 @@ interface RenderLabels {
 }
 ```
 
-::: tip Translating the whole interface
+## `FRENCH_LABELS`
+
 ```ts
+const FRENCH_LABELS: RenderLabels;
+```
+
+The complete set this library shipped as its default until 0.2.0, so the previous
+rendering is one line away rather than eighteen:
+
+```ts
+import { FRENCH_LABELS } from "reqif-preview";
+
 const html = await renderPackageToHtml(pkg, {
-  dateLocale: "en-US",
-  labels: {
-    noContent: "(empty)", untitled: "(untitled)", technicalDetails: "Technical details",
-    yes: "Yes", no: "No", relationsLabel: "Links",
-  },
+  labels: FRENCH_LABELS,
+  dateLocale: "fr-FR",
 });
 ```
-:::
+
+Any other language is the same shape — `labels` is partial, so supply only what you need.
 
 ## `CustomAttributeRenderer`
 
@@ -96,19 +104,46 @@ const html = await renderPackageToHtml(pkg, {
 interface CustomAttributeRenderer {
   attribute: string;                    // long name (case/space-insensitive) or identifier
   position?: "before" | "after";        // default: "before"
-  render(value: AttributeValue | undefined, ctx: AttributeRenderContext): string | undefined;
+  render(value: AttributeValue | undefined, ctx: AttributeRenderContext): RenderOutput;
   hideFromTechnical?: boolean;          // default: false
 }
 ```
 
-The HTML you return is inserted **as-is** — it is code you wrote, not document content, so
-it is not sanitised. Escape interpolated text with
-[`escapeHtml`](/api/rendering#escapehtml).
-
 Two safety nets: an exception inside `render()` is caught (`custom-renderer-threw`), and
-HTML with unbalanced tags is shown as escaped text (`custom-renderer-unbalanced-html`)
-rather than breaking the structure of everything that follows. See
-[Custom renderers](/guide/custom-renderers).
+unbalanced `dangerouslyRawHtml` is shown as escaped text
+(`custom-renderer-unbalanced-html`) rather than breaking the structure of everything that
+follows. See [Custom renderers](/guide/custom-renderers).
+
+## `RenderOutput`, `RenderNode`, `RenderElement`, `RenderRawHtml`
+
+What a renderer returns. Text is escaped by default; raw markup has to be asked for by
+name.
+
+```ts
+type RenderNode = string | RenderElement | RenderRawHtml;
+
+interface RenderElement {
+  tag: string;                      // allow-listed, otherwise unwrapped (unwrapped-tag)
+  attrs?: Record<string, string>;   // allow-listed, values escaped
+  children?: RenderNode[];          // a string here is text
+}
+
+interface RenderRawHtml {
+  dangerouslyRawHtml: string;       // inserted verbatim — escape it yourself
+}
+
+type RenderOutput = RenderElement | RenderRawHtml | RenderNode[] | undefined;
+```
+
+| | Allowed |
+|---|---|
+| Tags | `span` `div` `p` `a` `code` `strong` `b` `em` `i` `small` `br` `img` `ul` `ol` `li` |
+| Attributes | `class` `id` `title` `lang` `dir`, plus `href` / `src` through the URL-scheme filter |
+
+`style` is deliberately absent — presentation belongs in your own stylesheet. A bare string
+is **not** accepted at the top level: under the previous API it meant raw HTML, so
+accepting it would silently change what existing renderers produce. From untyped
+JavaScript it is escaped, with `custom-renderer-raw-string`.
 
 ## `AttributeRenderContext`
 

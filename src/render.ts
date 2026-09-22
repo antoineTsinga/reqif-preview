@@ -1,6 +1,6 @@
 import { ReqIfIndex } from "./lookup.js";
 import { toBase64 } from "./base64.js";
-import { escapeHtml } from "./escape.js";
+import { escapeAttr, escapeHtml } from "./escape.js";
 import { DEFAULT_CSS } from "./styles.js";
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
@@ -58,6 +58,33 @@ export interface RenderLabels {
 }
 
 const DEFAULT_LABELS: RenderLabels = {
+  noContent: "(empty)",
+  untitled: "(untitled)",
+  idLabel: "ID",
+  technicalDetails: "Technical details",
+  headerTitle: "Title",
+  headerSourceTool: "Source tool",
+  headerExportedBy: "Exported by",
+  headerCreationTime: "Creation date",
+  headerComment: "Comment",
+  yes: "Yes",
+  no: "No",
+  createdByLabel: "Created by",
+  createdOnLabel: "Created",
+  modifiedByLabel: "Modified by",
+  modifiedOnLabel: "Modified",
+  relationsLabel: "Links",
+  relationFallbackType: "Relation",
+  relationUnresolved: "(target not found)",
+};
+
+/**
+ * The labels this library shipped as its default until 0.2.0, kept so the
+ * previous rendering is one line away rather than eighteen:
+ *
+ *     renderPackageToHtml(pkg, { labels: FRENCH_LABELS, dateLocale: "fr-FR" })
+ */
+export const FRENCH_LABELS: RenderLabels = {
   noContent: "(vide)",
   untitled: "(sans titre)",
   idLabel: "ID",
@@ -313,11 +340,7 @@ export function renderSpecification(
 // Internals
 // ---------------------------------------------------------------------------
 
-export { escapeHtml } from "./escape.js";
-
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
-}
+export { escapeAttr, escapeHtml } from "./escape.js";
 
 /** Formats an ISO date/datetime for display; falls back to the raw string if it can't be parsed. */
 function formatDate(iso: string, locale: string, onDegradation?: DegradationHandler): string {
@@ -565,7 +588,7 @@ function renderSpecObjectBody(
 ): string {
   const specType = index.specTypes.get(obj.typeRef);
   const lifecycle = extractLifecycleInfo(obj, index);
-  const dateLocale = options.dateLocale ?? "fr-FR";
+  const dateLocale = options.dateLocale ?? "en-GB";
 
   const simple = renderSimpleView(obj, specType, index, attachments, labels, options, lifecycle, dateLocale, isChapter, suppressContent);
   const technical = options.readingMode

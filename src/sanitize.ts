@@ -1,4 +1,4 @@
-import { escapeHtml } from "./escape.js";
+import { escapeAttr, escapeHtml } from "./escape.js";
 import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import type { XhtmlContent, XhtmlElementNode, XhtmlNode } from "./types.js";
 
@@ -53,11 +53,8 @@ export interface XhtmlRenderOptions {
   onDegradation?: DegradationHandler;
 }
 
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
-}
-
-function sanitizeHref(href: string | undefined, opts: XhtmlRenderOptions): string | undefined {
+/** Shared with custom-render.ts: one URL-scheme filter, not two. */
+export function sanitizeHref(href: string | undefined, opts: XhtmlRenderOptions): string | undefined {
   if (!href) return undefined;
   const trimmed = href.trim();
   if (/^(javascript|vbscript|data):/i.test(trimmed)) {

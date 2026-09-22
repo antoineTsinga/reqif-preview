@@ -35,6 +35,8 @@ a change in behaviour.
 | `missing-spec-object` | a tree node pointing at a `SpecObject` that does not exist |
 | `custom-renderer-threw` | a `customAttributeRenderers` threw and was ignored |
 | `custom-renderer-unbalanced-html` | custom HTML left unbalanced, escaped as text |
+| `custom-renderer-raw-string` | a renderer returned a bare string; escaped as text |
+| `custom-renderer-dropped-attr` | a custom-renderer node carried a non-allow-listed attribute |
 | `dropped-tag` | a tag removed along with its subtree (`<script>`, `<iframe>`…) |
 | `unwrapped-tag` | a non-allow-listed tag unwrapped, children kept |
 | `dropped-style-declaration` | an invalid `style` declaration discarded |

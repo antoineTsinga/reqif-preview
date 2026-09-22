@@ -1,4 +1,4 @@
-import { escapeHtml } from "./escape.js";
+import { escapeAttr, escapeHtml } from "./escape.js";
 
 export interface TabItem {
   /**
@@ -10,10 +10,6 @@ export interface TabItem {
   id: string;
   label: string;
   html: string;
-}
-
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
 }
 
 /**

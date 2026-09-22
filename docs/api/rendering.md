@@ -163,7 +163,9 @@ kept.
 function escapeHtml(s: string): string;
 ```
 
-Escapes `&`, `<`, `>` and quotation marks. Exported because the HTML returned by your
+Escapes `&`, `<` and `>` — text destined for an element's **body**.
+
+Exported because the HTML returned by your
 [`customAttributeRenderers`](/api/options#customattributerenderer) **is not sanitised**: if
 you interpolate text coming from the file into it, escaping it is up to you.
 
@@ -173,3 +175,28 @@ you interpolate text coming from the file into it, escaping it is up to you.
 import { escapeHtml } from "reqif-preview";
 render: (v) => `<span class="badge">${escapeHtml(v?.value ?? "")}</span>`;
 ```
+
+::: danger Not enough for an attribute value
+`escapeHtml` **leaves quotation marks alone**. In `title="${escapeHtml(v)}"`, a value
+containing `"` closes the attribute early and opens another one — an `onclick`, say. For an
+attribute, use [`escapeAttr`](#escapeattr).
+:::
+
+## `escapeAttr`
+
+```ts
+function escapeAttr(s: string): string;
+```
+
+Everything `escapeHtml` does, **plus the quotation mark** that would end the attribute.
+
+<!-- exemple: extrait — une ligne `render:` volontairement hors contexte -->
+
+```ts
+import { escapeAttr } from "reqif-preview";
+render: (v) => `<span title="${escapeAttr(v?.value ?? "")}">…</span>`;
+```
+
+The two exist separately because the contexts differ: a `"` inside element text is harmless
+and escaping it only makes the markup noisier, while the same character inside an attribute
+is the whole attack.
