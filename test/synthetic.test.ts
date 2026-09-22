@@ -221,7 +221,7 @@ describe("synthetic fixture: customAttributeRenderers", () => {
           position: "before",
           render: (value) =>
             value?.kind === "STRING" && value.value
-              ? `<span class="puid-badge">${value.value}</span>`
+              ? { tag: "span", attrs: { class: "puid-badge" }, children: [value.value] }
               : undefined,
         },
       ],
@@ -238,7 +238,7 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "ad-puid", position: "after", render: (v) => (v?.kind === "STRING" ? `<em>${v.value}</em>` : undefined) },
+        { attribute: "ad-puid", position: "after", render: (v) => (v?.kind === "STRING" ? { tag: "em", children: [v.value ?? ""] } : undefined) },
       ],
     });
     const emIndex = html.indexOf("<em>SRS-42</em>");
@@ -256,7 +256,8 @@ describe("synthetic fixture: customAttributeRenderers", () => {
           render: (_value, ctx) => {
             const name = ctx.getValue("Name");
             const formatted = ctx.formatValue(name);
-            return `<span class="cross-attr">${formatted}</span>`;
+            // formatValue renvoie du HTML déjà assaini, pas du texte.
+            return { tag: "span", attrs: { class: "cross-attr" }, children: [{ dangerouslyRawHtml: formatted }] };
           },
         },
       ],
@@ -268,13 +269,13 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const shown = await renderPackageToHtml(pkg, {
       includeCss: false,
-      customAttributeRenderers: [{ attribute: "IE PUID", render: () => "<b>x</b>" }],
+      customAttributeRenderers: [{ attribute: "IE PUID", render: () => ({ tag: "b", children: ["x"] }) }],
     });
     expect(shown).toContain("IE PUID");
 
     const hidden = await renderPackageToHtml(pkg, {
       includeCss: false,
-      customAttributeRenderers: [{ attribute: "IE PUID", hideFromTechnical: true, render: () => "<b>x</b>" }],
+      customAttributeRenderers: [{ attribute: "IE PUID", hideFromTechnical: true, render: () => ({ tag: "b", children: ["x"] }) }],
     });
     expect(hidden).not.toContain("IE PUID");
   });
@@ -300,7 +301,7 @@ describe("synthetic fixture: customAttributeRenderers", () => {
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v ? `<span class="puid-badge">${v.kind === "STRING" ? v.value : ""}</span>` : undefined) },
+        { attribute: "IE PUID", render: (v) => (v ? { tag: "span", attrs: { class: "puid-badge" }, children: [v.kind === "STRING" ? (v.value ?? "") : ""] } : undefined) },
       ],
     });
     // so-2 has no "IE PUID" value, so its badge must not appear at all near its block.
@@ -386,7 +387,7 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<div class="puid-badge">${v.value}` : undefined) }, // missing </div>
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<div class="puid-badge">${v.value}` } : undefined) }, // missing </div>
       ],
     });
     // the broken tag must be escaped, not inserted raw...
@@ -402,19 +403,19 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<span>${v.value}</span></span>` : undefined) }, // extra </span>
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<span>${v.value}</span></span>` } : undefined) }, // extra </span>
       ],
     });
     expect(html).toContain("&lt;span&gt;SRS-42&lt;/span&gt;&lt;/span&gt;");
     expect(html).toContain('<div class="reqif-content">');
   });
 
-  it("still inserts well-formed custom HTML as raw markup, unescaped", async () => {
+  it("still inserts well-formed dangerouslyRawHtml as raw markup, unescaped", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       customAttributeRenderers: [
-        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<span class="puid-badge">${v.value}</span>` : undefined) },
+        { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<span class="puid-badge">${v.value}</span>` } : undefined) },
       ],
     });
     expect(html).toContain('<span class="puid-badge">SRS-42</span>');
@@ -427,13 +428,144 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
       customAttributeRenderers: [
         {
           attribute: "IE PUID",
-          render: () => `<table><tr><th>Champ</th><th>Valeur</th></tr><tr><td>PUID</td><td>SRS-42</td></tr>`, // missing </table>
+          render: () => ({ dangerouslyRawHtml: `<table><tr><th>Champ</th><th>Valeur</th></tr><tr><td>PUID</td><td>SRS-42</td></tr>` }), // missing </table>
         },
       ],
     });
     expect(html).toContain("&lt;table&gt;");
     expect(html).toContain('<div class="reqif-content">');
     expect(html).toContain('<details class="reqif-technical">');
+  });
+});
+
+describe("customAttributeRenderers: escaping is the default, raw markup is opt-in", () => {
+  // Well-formed on purpose: this is exactly what the balance check cannot see.
+  const PAYLOAD = `<img src=x onerror="alert(1)">`;
+
+  function collect() {
+    const events: DegradationEvent[] = [];
+    return { events, onDegradation: (e: DegradationEvent) => events.push(e) };
+  }
+  const codes = (events: DegradationEvent[]) => events.map((e) => e.code);
+
+  it("escapes document content used as a text child, rather than inserting it", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ({ tag: "span", children: [PAYLOAD] }) },
+      ],
+    });
+    expect(html).not.toContain(PAYLOAD);
+    expect(html).toContain("&lt;img src=x onerror=");
+  });
+
+  it("escapes the quotation mark that would break out of an attribute value", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => ({ tag: "span", attrs: { title: `x" onclick="alert(1)` }, children: ["ok"] }),
+        },
+      ],
+    });
+    expect(html).not.toContain(`onclick="alert(1)"`);
+    expect(html).toContain("&quot; onclick=&quot;alert(1)");
+  });
+
+  it("drops an attribute outside the allowlist and says so", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => ({ tag: "span", attrs: { onclick: "alert(1)", style: "position:fixed", class: "kept" }, children: ["x"] }),
+        },
+      ],
+    });
+    expect(html).not.toContain("onclick");
+    expect(html).not.toContain("position:fixed");
+    expect(html).toContain('class="kept"');
+    // Once per SpecObject, so count the distinct attribute names rather than the events.
+    const dropped = new Set(
+      events.filter((e) => e.code === "custom-renderer-dropped-attr").map((e) => e.detail?.attr),
+    );
+    expect([...dropped].sort()).toEqual(["onclick", "style"]);
+  });
+
+  it("neutralises a blocked URL scheme on href, through the same filter as document content", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        {
+          attribute: "IE PUID",
+          render: () => ({ tag: "a", attrs: { href: "javascript:alert(1)" }, children: ["cliquez"] }),
+        },
+      ],
+    });
+    expect(html).not.toContain("javascript:");
+    expect(html).toContain(">cliquez</a>"); // the label survives, only the href goes
+    expect(codes(events)).toContain("dropped-href");
+  });
+
+  it("unwraps a tag outside the allowlist, keeping its children", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ({ tag: "marquee", children: ["gardé"] }) },
+      ],
+    });
+    expect(html).not.toContain("<marquee");
+    expect(html).toContain("gardé");
+    expect(codes(events)).toContain("unwrapped-tag");
+  });
+
+  it("escapes a bare string returned from untyped JavaScript, and names the migration", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const { events, onDegradation } = collect();
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      onDegradation,
+      customAttributeRenderers: [
+        // What a JS consumer still on the old API would return.
+        { attribute: "IE PUID", render: (() => PAYLOAD) as never },
+      ],
+    });
+    expect(html).not.toContain(PAYLOAD);
+    expect(codes(events)).toContain("custom-renderer-raw-string");
+  });
+
+  it("inserts dangerouslyRawHtml verbatim — the escape hatch still opens", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ({ dangerouslyRawHtml: `<span data-raw="1">brut</span>` }) },
+      ],
+    });
+    expect(html).toContain(`<span data-raw="1">brut</span>`);
+  });
+
+  it("accepts an array at the top level, mixing text and elements", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, {
+      includeCss: false,
+      customAttributeRenderers: [
+        { attribute: "IE PUID", render: () => ["avant ", { tag: "code", children: ["SRS-42"] }] },
+      ],
+    });
+    expect(html).toContain("avant <code>SRS-42</code>");
   });
 });
 
@@ -488,7 +620,7 @@ describe("synthetic fixture: readingMode (Word-like clean view)", () => {
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
       readingMode: true,
-      customAttributeRenderers: [{ attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? `<em>${v.value}</em>` : undefined) }],
+      customAttributeRenderers: [{ attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { tag: "em", children: [v.value ?? ""] } : undefined) }],
     });
     expect(html).toContain("<em>SRS-42</em>");
   });
@@ -741,7 +873,7 @@ describe("suppressEmptyPlaceholdersForChapters", () => {
       customAttributeRenderers: [
         {
           attribute: "ad-name", // arbitrary; we only care about ctx.isChapter here
-          render: (_v, ctx) => (ctx.isChapter ? `<em data-chapter-marker="1"></em>` : undefined),
+          render: (_v, ctx) => (ctx.isChapter ? { dangerouslyRawHtml: `<em data-chapter-marker="1"></em>` } : undefined),
         },
       ],
     });
@@ -1189,7 +1321,7 @@ describe("onDegradation: making the silent fallbacks observable", () => {
       onDegradation,
       customAttributeRenderers: [
         { attribute: "Name", render: () => { throw new Error("boom"); } },
-        { attribute: "Count", position: "after", render: () => "<div>never closed" },
+        { attribute: "Count", position: "after", render: () => ({ dangerouslyRawHtml: "<div>never closed" }) },
       ],
     });
     expect(codes(events)).toContain("custom-renderer-threw");

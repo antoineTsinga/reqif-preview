@@ -96,19 +96,46 @@ const html = await renderPackageToHtml(pkg, {
 interface CustomAttributeRenderer {
   attribute: string;                    // long name (case/space-insensitive) or identifier
   position?: "before" | "after";        // default: "before"
-  render(value: AttributeValue | undefined, ctx: AttributeRenderContext): string | undefined;
+  render(value: AttributeValue | undefined, ctx: AttributeRenderContext): RenderOutput;
   hideFromTechnical?: boolean;          // default: false
 }
 ```
 
-The HTML you return is inserted **as-is** — it is code you wrote, not document content, so
-it is not sanitised. Escape interpolated text with
-[`escapeHtml`](/api/rendering#escapehtml).
-
 Two safety nets: an exception inside `render()` is caught (`custom-renderer-threw`), and
-HTML with unbalanced tags is shown as escaped text (`custom-renderer-unbalanced-html`)
-rather than breaking the structure of everything that follows. See
-[Custom renderers](/guide/custom-renderers).
+unbalanced `dangerouslyRawHtml` is shown as escaped text
+(`custom-renderer-unbalanced-html`) rather than breaking the structure of everything that
+follows. See [Custom renderers](/guide/custom-renderers).
+
+## `RenderOutput`, `RenderNode`, `RenderElement`, `RenderRawHtml`
+
+What a renderer returns. Text is escaped by default; raw markup has to be asked for by
+name.
+
+```ts
+type RenderNode = string | RenderElement | RenderRawHtml;
+
+interface RenderElement {
+  tag: string;                      // allow-listed, otherwise unwrapped (unwrapped-tag)
+  attrs?: Record<string, string>;   // allow-listed, values escaped
+  children?: RenderNode[];          // a string here is text
+}
+
+interface RenderRawHtml {
+  dangerouslyRawHtml: string;       // inserted verbatim — escape it yourself
+}
+
+type RenderOutput = RenderElement | RenderRawHtml | RenderNode[] | undefined;
+```
+
+| | Allowed |
+|---|---|
+| Tags | `span` `div` `p` `a` `code` `strong` `b` `em` `i` `small` `br` `img` `ul` `ol` `li` |
+| Attributes | `class` `id` `title` `lang` `dir`, plus `href` / `src` through the URL-scheme filter |
+
+`style` is deliberately absent — presentation belongs in your own stylesheet. A bare string
+is **not** accepted at the top level: under the previous API it meant raw HTML, so
+accepting it would silently change what existing renderers produce. From untyped
+JavaScript it is escaped, with `custom-renderer-raw-string`.
 
 ## `AttributeRenderContext`
 

@@ -40,6 +40,8 @@ type DegradationCode =
   | "duplicate-dom-id"
   | "custom-renderer-threw"
   | "custom-renderer-unbalanced-html"
+  | "custom-renderer-raw-string"
+  | "custom-renderer-dropped-attr"
   | "dropped-tag"
   | "unwrapped-tag"
   | "dropped-style-declaration"
@@ -57,7 +59,9 @@ type DegradationCode =
 | `missing-spec-object` | a tree node pointing at a `SpecObject` that does not exist | `specHierarchy`, `objectRef` |
 | `duplicate-dom-id` | an object rendered more than once; only the first carries the `id` | `specObject`, `id`, `specHierarchy` |
 | `custom-renderer-threw` | a `customAttributeRenderers` threw and was ignored | `attribute`, `specObject`, `error` |
-| `custom-renderer-unbalanced-html` | custom HTML left unbalanced, escaped as text | `attribute`, `specObject`, `html` |
+| `custom-renderer-unbalanced-html` | `dangerouslyRawHtml` left unbalanced, escaped as text | `attribute`, `specObject`, `html` |
+| `custom-renderer-raw-string` | a renderer returned a bare string; escaped as text | `attribute`, `specObject`, `value` |
+| `custom-renderer-dropped-attr` | a node carried an attribute outside the allowlist | `attribute`, `specObject`, `attr`, `tag` |
 | `dropped-tag` | a tag removed along with its subtree (`<script>`, `<iframe>`…) | `tag` |
 | `unwrapped-tag` | a non-allow-listed tag unwrapped, children kept | `tag` |
 | `dropped-style-declaration` | an invalid `style` declaration discarded | `prop`, `value` |

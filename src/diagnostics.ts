@@ -29,6 +29,10 @@ export type DegradationCode =
   | "custom-renderer-threw"
   /** A customAttributeRenderers callback returned unbalanced HTML; it was escaped. */
   | "custom-renderer-unbalanced-html"
+  /** A customAttributeRenderers callback returned a bare string; it was escaped as text. */
+  | "custom-renderer-raw-string"
+  /** A customAttributeRenderers node carried an attribute outside the allowlist. */
+  | "custom-renderer-dropped-attr"
   /** A tag in DROP_ENTIRELY_TAGS was removed together with its subtree. */
   | "dropped-tag"
   /** A tag outside the allowlist was unwrapped; its children were kept. */

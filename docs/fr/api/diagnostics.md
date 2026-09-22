@@ -40,6 +40,8 @@ type DegradationCode =
   | "duplicate-dom-id"
   | "custom-renderer-threw"
   | "custom-renderer-unbalanced-html"
+  | "custom-renderer-raw-string"
+  | "custom-renderer-dropped-attr"
   | "dropped-tag"
   | "unwrapped-tag"
   | "dropped-style-declaration"
@@ -57,7 +59,9 @@ type DegradationCode =
 | `missing-spec-object` | nœud d'arborescence pointant vers un `SpecObject` inexistant | `specHierarchy`, `objectRef` |
 | `duplicate-dom-id` | objet rendu plusieurs fois ; seule la première occurrence porte l'`id` | `specObject`, `id`, `specHierarchy` |
 | `custom-renderer-threw` | un `customAttributeRenderers` a levé et a été ignoré | `attribute`, `specObject`, `error` |
-| `custom-renderer-unbalanced-html` | HTML personnalisé mal fermé, échappé en texte | `attribute`, `specObject`, `html` |
+| `custom-renderer-unbalanced-html` | `dangerouslyRawHtml` mal fermé, échappé en texte | `attribute`, `specObject`, `html` |
+| `custom-renderer-raw-string` | un rendu a retourné une chaîne nue ; échappée en texte | `attribute`, `specObject`, `value` |
+| `custom-renderer-dropped-attr` | un nœud portait un attribut hors liste blanche | `attribute`, `specObject`, `attr`, `tag` |
 | `dropped-tag` | balise supprimée avec son sous-arbre (`<script>`, `<iframe>`…) | `tag` |
 | `unwrapped-tag` | balise hors liste blanche déballée, enfants conservés | `tag` |
 | `dropped-style-declaration` | déclaration `style` invalide abandonnée | `prop`, `value` |

@@ -53,7 +53,8 @@ export interface XhtmlRenderOptions {
   onDegradation?: DegradationHandler;
 }
 
-function sanitizeHref(href: string | undefined, opts: XhtmlRenderOptions): string | undefined {
+/** Shared with custom-render.ts: one URL-scheme filter, not two. */
+export function sanitizeHref(href: string | undefined, opts: XhtmlRenderOptions): string | undefined {
   if (!href) return undefined;
   const trimmed = href.trim();
   if (/^(javascript|vbscript|data):/i.test(trimmed)) {

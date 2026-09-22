@@ -35,6 +35,8 @@ craindre un changement de comportement.
 | `missing-spec-object` | nœud d'arborescence pointant vers un `SpecObject` inexistant |
 | `custom-renderer-threw` | un `customAttributeRenderers` a levé et a été ignoré |
 | `custom-renderer-unbalanced-html` | HTML personnalisé mal fermé, échappé en texte |
+| `custom-renderer-raw-string` | un rendu a retourné une chaîne nue ; échappée en texte |
+| `custom-renderer-dropped-attr` | un nœud de rendu portait un attribut hors liste blanche |
 | `dropped-tag` | balise supprimée avec son sous-arbre (`<script>`, `<iframe>`…) |
 | `unwrapped-tag` | balise hors liste blanche déballée, enfants conservés |
 | `dropped-style-declaration` | déclaration `style` invalide abandonnée |
