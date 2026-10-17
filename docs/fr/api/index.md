@@ -125,13 +125,15 @@ navigateur. Comme `innerHTML` est la façon dont la plupart des pages utilisent 
 bibliothèque, le script doit être installé séparément :
 
 ```ts
-import { renderPackageToHtml, activateTechnicalPanels } from "reqif-preview";
+import { renderPackageToHtml, expandLazyPanels } from "reqif-preview";
 
 const html = await renderPackageToHtml(pkg);
 document.getElementById("preview")!.innerHTML = html;
 
-// Une fois, après l'insertion. Idempotent, et sans effet hors navigateur.
-activateTechnicalPanels();
+// Une fois, n'importe quand. Elle ne pose qu'un écouteur : l'ordre par rapport
+// à innerHTML n'importe pas -- tôt vaut mieux que tard, cela étant, car un
+// panneau ouvert avant l'écouteur affiche le repli jusqu'à sa réouverture.
+expandLazyPanels();
 ```
 
 Les pages rendues côté serveur n'ont rien à faire : le script inline arrive dans le
@@ -150,6 +152,6 @@ import { DEFAULT_JS } from "reqif-preview";
 const html = await renderPackageToHtml(pkg, { includeJs: false });
 ```
 
-`DEFAULT_JS` et `activateTechnicalPanels` font la même chose selon les mêmes règles — le
+`DEFAULT_JS` et `expandLazyPanels` font la même chose selon les mêmes règles — le
 premier comme texte que vous pouvez servir sous un nonce ou un hash, le second comme
 fonction à appeler.

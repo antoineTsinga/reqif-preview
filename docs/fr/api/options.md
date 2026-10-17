@@ -27,7 +27,7 @@ Le même objet est accepté par `renderPackageToHtml`, `renderDocumentToHtml` et
 | `titleAttributes` | `string[]` | — | Attributs essayés comme titre **en dernier recours**, après les `LONG-NAME`. |
 | `showTechnicalByDefault` | `boolean` | `false` | Ouvre le panneau « Détails techniques » d'entrée. |
 | `technicalPanel` | `"lazy" \| "eager" \| "off"` | `"lazy"` | Comment le panneau « Détails techniques » est émis. `"lazy"` diffère la construction de ses nœuds jusqu'à son ouverture, `"eager"` l'écrit en entier, `"off"` l'omet. Voir [Panneau technique](/fr/api/#panneau-technique). |
-| `includeJs` | `boolean` | `true` | Inclut le petit script qui déploie les panneaux paresseux. Ignoré sauf si `technicalPanel` vaut `"lazy"`. Passez `false` sous une CSP stricte et appelez `activateTechnicalPanels()` à la place. |
+| `includeJs` | `boolean` | `true` | Inclut le petit script qui déploie les panneaux paresseux. Ignoré sauf si `technicalPanel` vaut `"lazy"`. Passez `false` sous une CSP stricte et appelez `expandLazyPanels()` à la place. |
 | `hideEmptyAttributes` | `boolean` | `true` | Omet du panneau technique les attributs sans aucune valeur. |
 | `preferSimplifiedXhtml` | `boolean` | `false` | Affiche la version simplifiée plutôt que l'original. [Détails](/fr/guide/texte-simplifie) |
 | `showRelations` | `boolean` | `true` | Affiche les liens entrants/sortants. Visible aussi en `readingMode`. |

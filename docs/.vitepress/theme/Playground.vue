@@ -170,7 +170,7 @@ async function render() {
     // library's own expander has to be installed from here, or the lazy
     // technical panels would open onto their "needs JavaScript" message.
     // Idempotent: one document-level listener, however often this runs.
-    lib.value.activateTechnicalPanels?.();
+    lib.value.expandLazyPanels?.();
     status.value = `${fileName.value} — ${t.value.renderedAt} ${new Date().toLocaleTimeString(lang.value)}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);

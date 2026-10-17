@@ -19,7 +19,7 @@
  *   - `renderPackageToHtml` embeds `DEFAULT_JS` as an inline `<script>`, which
  *     covers server-rendered pages where the markup arrives in the initial
  *     document.
- *   - `activateTechnicalPanels()` covers the browser path, because **a
+ *   - `expandLazyPanels()` covers the browser path, because **a
  *     `<script>` inserted through `innerHTML` never executes** — that is the
  *     HTML specification, not a quirk, and `innerHTML` is exactly how the
  *     README tells people to use this library. Emitting only the inline script
@@ -68,17 +68,25 @@ export function unescapePanelPayload(text: string): string {
 }
 
 /**
- * Hydrates lazily-rendered technical panels as they are opened.
+ * Expands `technicalPanel: "lazy"` panels as they are opened. Needed in that
+ * mode and no other — there is nothing deferred to expand under `"eager"` or
+ * `"off"`, where calling this is harmless but pointless.
  *
- * Call it once after inserting the HTML. Safe to call again — it installs a
- * single listener and ignores panels it has already expanded. Does nothing
- * outside a browser, so it is harmless on the server.
+ * It installs a listener and nothing more: no existing panel is touched at call
+ * time. So the order relative to inserting the HTML does not matter, though
+ * early beats late — a panel opened before the listener exists shows the
+ * fallback message until it is closed and reopened. Calling it repeatedly is
+ * safe, and outside a browser it does nothing at all.
  *
- * The listener is attached in the capture phase and on the document rather than
- * on each panel: `toggle` does not bubble, and capture lets one listener serve
- * every panel, including those inserted later.
+ * The listener goes on the root in the capture phase rather than on each panel,
+ * because `toggle` does not bubble. One listener then serves every panel,
+ * including those inserted later — which is what makes the call order
+ * irrelevant.
+ *
+ * @param root Pass a shadow root to reach panels inside it: `toggle` does not
+ *   cross a shadow boundary, so a listener on the document would never see them.
  */
-export function activateTechnicalPanels(root: Document | ShadowRoot | undefined = globalThis.document): void {
+export function expandLazyPanels(root: Document | ShadowRoot | undefined = globalThis.document): void {
   if (!root || typeof root.addEventListener !== "function") return;
   const host = root as unknown as Record<string, unknown>;
   if (host[INSTALLED]) return;

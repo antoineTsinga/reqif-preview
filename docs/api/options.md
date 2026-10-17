@@ -27,7 +27,7 @@ The same object is accepted by `renderPackageToHtml`, `renderDocumentToHtml` and
 | `titleAttributes` | `string[]` | — | Attributes tried as a title **as a last resort**, after the `LONG-NAME`s. |
 | `showTechnicalByDefault` | `boolean` | `false` | Opens the "Technical details" panel from the start. |
 | `technicalPanel` | `"lazy" \| "eager" \| "off"` | `"lazy"` | How the "Technical details" panel is emitted. `"lazy"` defers building its nodes until it is opened, `"eager"` writes it out in full, `"off"` omits it. See [Technical panel](/api/#technical-panel). |
-| `includeJs` | `boolean` | `true` | Includes the small script that expands lazy panels. Ignored unless `technicalPanel` is `"lazy"`. Set it to `false` under a strict CSP and call `activateTechnicalPanels()` instead. |
+| `includeJs` | `boolean` | `true` | Includes the small script that expands lazy panels. Ignored unless `technicalPanel` is `"lazy"`. Set it to `false` under a strict CSP and call `expandLazyPanels()` instead. |
 | `hideEmptyAttributes` | `boolean` | `true` | Omits attributes with no value at all from the technical panel. |
 | `preferSimplifiedXhtml` | `boolean` | `false` | Shows the simplified version rather than the original. [Details](/guide/simplified-text) |
 | `showRelations` | `boolean` | `true` | Shows incoming/outgoing links. Visible in `readingMode` too. |

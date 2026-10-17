@@ -122,13 +122,15 @@ executes** — that is the HTML specification, not a quirk of any browser. Since
 is how most pages use this library, the script has to be installed separately:
 
 ```ts
-import { renderPackageToHtml, activateTechnicalPanels } from "reqif-preview";
+import { renderPackageToHtml, expandLazyPanels } from "reqif-preview";
 
 const html = await renderPackageToHtml(pkg);
 document.getElementById("preview")!.innerHTML = html;
 
-// Once, after inserting. Idempotent, and a no-op outside a browser.
-activateTechnicalPanels();
+// Once, any time. It only installs a listener, so the order relative to
+// innerHTML does not matter -- though early is better than late, since a
+// panel opened before the listener exists shows the fallback until reopened.
+expandLazyPanels();
 ```
 
 Server-rendered pages need nothing: the inline script arrives in the initial document and
@@ -147,5 +149,5 @@ import { DEFAULT_JS } from "reqif-preview";
 const html = await renderPackageToHtml(pkg, { includeJs: false });
 ```
 
-`DEFAULT_JS` and `activateTechnicalPanels` do the same thing by the same rules — the first
+`DEFAULT_JS` and `expandLazyPanels` do the same thing by the same rules — the first
 as text you can serve under a nonce or hash, the second as a function you call.

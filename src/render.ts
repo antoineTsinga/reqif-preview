@@ -118,7 +118,7 @@ export interface RenderOptions {
    * Default: true, and ignored unless `technicalPanel` is `"lazy"`.
    *
    * Set it to false under a strict Content-Security-Policy, which blocks inline
-   * scripts, and call `activateTechnicalPanels()` yourself instead.
+   * scripts, and call `expandLazyPanels()` yourself instead.
    */
   includeJs?: boolean;
   /**
@@ -134,7 +134,7 @@ export interface RenderOptions {
    *   option did. No JavaScript involved.
    * - `"off"` omits it entirely.
    *
-   * `"lazy"` needs the inline script to run, or `activateTechnicalPanels()` to
+   * `"lazy"` needs the inline script to run, or `expandLazyPanels()` to
    * be called — notably when you assign the HTML with `innerHTML`, which never
    * executes an inline script. Until then the panel opens onto the
    * `labels.technicalUnavailable` message rather than onto nothing.

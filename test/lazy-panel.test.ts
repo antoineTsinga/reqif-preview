@@ -79,7 +79,7 @@ describe("the inline script", () => {
     expect(await renderPackageToHtml(pkg)).toMatch(inline);
     expect(await renderPackageToHtml(pkg, { technicalPanel: "eager" })).not.toMatch(inline);
     expect(await renderPackageToHtml(pkg, { technicalPanel: "off" })).not.toMatch(inline);
-    // Strict CSP blocks inline scripts; activateTechnicalPanels() replaces it.
+    // Strict CSP blocks inline scripts; expandLazyPanels() replaces it.
     expect(await renderPackageToHtml(pkg, { includeJs: false })).not.toMatch(inline);
   });
 
