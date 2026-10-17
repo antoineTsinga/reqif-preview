@@ -39,10 +39,21 @@ une documentation ne reste alignée sur le code que si un écart casse quelque c
 - **`scripts/sync-docs-assets.mjs`** copie `dist/index.js` vers `docs/public/`, régénère le
   `.reqifz` d'exemple et produit l'illustration de la page d'accueil en rendant ce paquet.
   Ces trois sorties sont gitignorées : ce sont des artefacts, jamais du contenu de dépôt.
-- **`scripts/check-docs.mjs`** échoue si un symbole exporté par `src/index.ts` n'est
-  documenté nulle part sous `docs/api/`. La liste des exports est lue via le compilateur
-  TypeScript, donc `export * from "./types.js"` est développé exactement comme un
-  consommateur le voit.
+- **`scripts/check-docs.mjs`** fait deux contrôles, tous deux dérivés du code par le
+  compilateur TypeScript plutôt que d'une liste à tenir à jour à la main.
+
+  Il échoue si un symbole exporté par `src/index.ts` n'est documenté nulle part sous
+  `docs/api/`. La liste des exports étant lue par le compilateur, `export * from
+  "./types.js"` est développé exactement comme un consommateur le voit.
+
+  Il échoue aussi si un bloc ```` ```ts interface X { … } ```` d'une page ne liste pas les
+  bons membres. Le premier contrôle ne suffit pas : un champ ajouté à `RenderLabels` a
+  déjà échappé à la doc sans rien casser, le nom `RenderLabels` restant mentionné. La
+  comparaison est volontairement asymétrique — un champ **déclaré sur** l'interface et
+  absent du bloc est une erreur, alors qu'un champ du bloc n'en est une que s'il n'existe
+  nulle part, héritage compris. Les pages utilisent les deux styles : certaines s'appuient
+  sur `extends`, d'autres aplatissent un champ venu d'une base non exportée, et les deux
+  sont honnêtes. Un bloc partiel à dessein se marque comme ci-dessous.
 - **`scripts/check-doc-examples.mjs`** échoue si un exemple de code utilise une variable
   dont on ne connaît pas la provenance. Il compile chaque bloc et ne signale que
   « Cannot find name » ; un bloc partiel à dessein se marque au-dessus par
