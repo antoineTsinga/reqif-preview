@@ -53,8 +53,10 @@ poursuivent. Pour savoir *ce qui* a été dégradé, voir [Diagnostics](/fr/api/
 ## Feuille de style
 
 Le rendu embarque sa propre feuille de style dans un `<style>` en tête du HTML retourné,
-scopée sur `.reqif-preview`. Il n'y a donc rien à importer ni à lier : c'est ce qui rend la
-sortie autonome, insérable telle quelle avec `innerHTML`.
+scopée sur `.reqif-preview`. Il n'y a donc rien à importer ni à lier pour l'habillage : la
+sortie est insérable telle quelle avec `innerHTML` et s'affichera correctement. Une seule
+chose demande un appel plutôt que du balisage — l'ouverture d'un panneau technique
+paresseux, traitée juste en dessous.
 
 Pour la fournir vous-même — cas d'une politique de sécurité de contenu (CSP) interdisant
 les `<style>` inline, ou d'un thème maison :

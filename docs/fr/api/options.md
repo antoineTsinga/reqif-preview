@@ -59,24 +59,25 @@ Tous les libellés d'interface, en anglais par défaut. `labels` accepte un obje
 
 ```ts
 interface RenderLabels {
-  noContent: string;              // "(vide)"
-  untitled: string;               // "(sans titre)"
-  idLabel: string;
-  technicalDetails: string;       // "Détails techniques"
-  headerTitle: string;
-  headerSourceTool: string;
-  headerExportedBy: string;
-  headerCreationTime: string;
-  headerComment: string;
-  yes: string;
-  no: string;
-  createdByLabel: string;
-  createdOnLabel: string;
-  modifiedByLabel: string;
-  modifiedOnLabel: string;
-  relationsLabel: string;         // "Liens"
-  relationFallbackType: string;
-  relationUnresolved: string;
+  noContent: string;              // "(empty)"
+  untitled: string;               // "(untitled)"
+  idLabel: string;                // "ID"
+  technicalDetails: string;       // "Technical details"
+  technicalUnavailable: string;   // "Details unavailable — this panel needs JavaScript."
+  headerTitle: string;            // "Title"
+  headerSourceTool: string;       // "Source tool"
+  headerExportedBy: string;       // "Exported by"
+  headerCreationTime: string;     // "Creation date"
+  headerComment: string;          // "Comment"
+  yes: string;                    // "Yes"
+  no: string;                     // "No"
+  createdByLabel: string;         // "Created by"
+  createdOnLabel: string;         // "Created"
+  modifiedByLabel: string;        // "Modified by"
+  modifiedOnLabel: string;        // "Modified"
+  relationsLabel: string;         // "Links"
+  relationFallbackType: string;   // "Relation"
+  relationUnresolved: string;     // "(target not found)"
 }
 ```
 

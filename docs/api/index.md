@@ -53,8 +53,9 @@ learn *what* was degraded, see [Diagnostics](/api/diagnostics).
 ## Stylesheet
 
 The render embeds its own stylesheet in a `<style>` at the top of the returned HTML,
-scoped to `.reqif-preview`. There is therefore nothing to import or link: that is what
-makes the output self-contained, insertable as-is with `innerHTML`.
+scoped to `.reqif-preview`. There is therefore nothing to import or link for the styling:
+the output is insertable as-is with `innerHTML` and will look right. One thing does need a
+call rather than markup — opening a lazy technical panel, covered just below.
 
 To supply it yourself — a Content Security Policy forbidding inline `<style>`, or a theme
 of your own:

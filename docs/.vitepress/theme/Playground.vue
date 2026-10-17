@@ -130,18 +130,31 @@ const renderOptions = computed(() => {
 
 const changedCount = computed(() => Object.keys(renderOptions.value).length);
 
-/** The snippet that reproduces exactly what the preview pane is showing. */
+/**
+ * The snippet that reproduces exactly what the preview pane is showing.
+ *
+ * "Exactly" includes expandLazyPanels(): the preview's technical panels open
+ * only because this component calls it, and a snippet that left it out would
+ * hand the reader a copy of the page whose panels stay shut. The default
+ * technicalPanel: "lazy" defers their markup, and innerHTML never runs the
+ * inline expander, so the call is part of the recipe rather than a detail.
+ */
 const snippet = computed(() => {
   const entries = Object.entries(renderOptions.value);
-  const head = `import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
+  const head = `import { loadReqIfPackage, renderPackageToHtml, expandLazyPanels } from "reqif-preview";
 
 const pkg = await loadReqIfPackage(bytes);
 `;
-  if (entries.length === 0) {
-    return `${head}const html = await renderPackageToHtml(pkg);`;
-  }
-  const body = entries.map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n");
-  return `${head}const html = await renderPackageToHtml(pkg, {\n${body}\n});`;
+  const call =
+    entries.length === 0
+      ? `const html = await renderPackageToHtml(pkg);`
+      : `const html = await renderPackageToHtml(pkg, {\n` +
+        entries.map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n") +
+        `\n});`;
+  return `${head}${call}
+
+preview.innerHTML = html;
+expandLazyPanels();`;
 });
 
 /** Grouped, because dropped-tag alone can fire thousands of times. */
