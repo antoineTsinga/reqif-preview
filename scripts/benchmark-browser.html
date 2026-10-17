@@ -1,0 +1,243 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>reqif-preview — banc navigateur</title>
+<!--
+  The half of the benchmark Node cannot do.
+
+  scripts/benchmark.mjs stops at "a 64 MB HTML string was produced". What the
+  user actually experiences includes handing that string to the DOM, and the
+  cost of that is invisible from Node — there is no DOM there. So this page
+  measures two things the table does not have:
+
+    - insertion into the DOM, layout forced, so the number is a real paint-ready
+      cost rather than an assignment that deferred all its work;
+    - the longest single task, via PerformanceObserver. On Node, "blocking time"
+      and "total time" are the same figure. In a browser they diverge, and it is
+      the longest *uninterrupted* task that decides whether the interface
+      freezes — 5 x 100 ms and 1 x 500 ms cost the same total and feel nothing
+      alike.
+
+  Opened by `npm run bench:browser`. Not automated on purpose: a headless-Chrome
+  dependency for two numbers read once per architectural decision is a permanent
+  cost for an occasional answer.
+-->
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.6 ui-sans-serif, system-ui, sans-serif;
+    margin: 0; padding: 2rem; max-width: 62rem;
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+  p.lede { margin: 0 0 1.5rem; opacity: .75; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; font-variant-numeric: tabular-nums; }
+  caption { text-align: left; font-weight: 600; padding: .6rem 0 .4rem; }
+  th, td { text-align: right; padding: .3rem .7rem; border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font-weight: 600; opacity: .7; }
+  tr.total td { font-weight: 600; border-bottom-width: 2px; }
+  /* Below the total on purpose: an alternative to a row above, not a step. */
+  tr.variant td { opacity: .7; font-style: italic; border-bottom: 0; }
+  .note { opacity: .7; font-size: .9em; }
+  #status { padding: .6rem .9rem; border-radius: 6px; background: color-mix(in srgb, currentColor 8%, transparent); }
+  /* The rendered preview is inserted here to be measured, then discarded.
+     Kept out of view so its own painting does not compete with the next case. */
+  #sink { position: absolute; left: -99999px; top: 0; width: 900px; }
+</style>
+
+<h1>reqif-preview — banc navigateur</h1>
+<p class="lede">
+  Insertion dans le DOM et plus longue tâche bloquante : les deux mesures que
+  <code>scripts/benchmark.mjs</code> ne peut pas produire depuis Node.
+</p>
+<div id="status">Chargement…</div>
+<div id="out"></div>
+<div id="sink" aria-hidden="true"></div>
+
+<script type="module">
+  import {
+    parseReqIfXml, ReqIfIndex, loadReqIfPackage, renderPackageToHtml,
+    createAttachmentLookup, renderSpecification,
+  } from "./dist/index.js";
+
+  const status = document.getElementById("status");
+  const out = document.getElementById("out");
+  const sink = document.getElementById("sink");
+
+  const MB = 1024 * 1024;
+  const ms = (n) => (n >= 100 ? n.toFixed(0) : n.toFixed(1));
+  const size = (bytes) =>
+    bytes < MB ? `${(bytes / 1024).toFixed(0)} Ko` : `${(bytes / MB).toFixed(2)} Mo`;
+
+  // Longest uninterrupted task, the figure that decides whether the UI freezes.
+  // Not supported everywhere; absent is reported as absent, never as zero.
+  let longest = 0;
+  let longTaskSupported = false;
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) longest = Math.max(longest, entry.duration);
+    }).observe({ type: "longtask", buffered: true });
+    longTaskSupported = true;
+  } catch {
+    /* Firefox and Safari have no longtask observer */
+  }
+
+  async function repeat(fn, runs) {
+    await fn(); // warmup
+    const times = [];
+    for (let i = 0; i < runs; i++) {
+      const started = performance.now();
+      await fn();
+      times.push(performance.now() - started);
+      // Yield, so the browser can paint and the next measure starts from rest.
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return Math.min(...times);
+  }
+
+  async function runCase(name) {
+    status.textContent = `${name} : chargement…`;
+    const raw = new Uint8Array(await (await fetch(`./${name}`)).arrayBuffer());
+    const runs = raw.length > 10 * MB ? 2 : 4;
+    const phases = [];
+
+    let xml;
+    if (name.endsWith(".reqifz")) {
+      const { unzipSync, strFromU8 } = await import("https://cdn.jsdelivr.net/npm/fflate@0.8.3/+esm");
+      phases.push(["décompression ZIP", await repeat(() => {
+        const entries = unzipSync(raw);
+        xml = strFromU8(entries[Object.keys(entries).find((n) => n.toLowerCase().endsWith(".reqif"))]);
+      }, runs)]);
+    } else {
+      xml = new TextDecoder().decode(raw);
+    }
+
+    status.textContent = `${name} : parsing…`;
+    phases.push(["parsing XML → modèle", await repeat(() => void parseReqIfXml(xml), runs)]);
+
+    const pkg = await loadReqIfPackage(raw);
+    const doc = pkg.document;
+
+    phases.push(["construction de l'index", await repeat(() => void new ReqIfIndex(doc), runs)]);
+    const index = new ReqIfIndex(doc);
+
+    phases.push(["résolution des pièces jointes",
+      await repeat(() => createAttachmentLookup(doc, pkg.attachments), runs)]);
+    const lookup = await createAttachmentLookup(doc, pkg.attachments);
+
+    status.textContent = `${name} : rendu…`;
+    const spec = doc.coreContent.specifications[0];
+    phases.push(["rendu d'une spécification (sync)",
+      await repeat(() => void renderSpecification(spec, index, lookup), runs)]);
+
+    const html = await renderPackageToHtml(pkg);
+
+    // The measurement Node cannot make. offsetHeight forces layout, so this is
+    // the cost of markup the browser has actually laid out — assigning
+    // innerHTML alone would let it defer most of the work and read as fast.
+    status.textContent = `${name} : insertion dans le DOM (${(html.length / MB).toFixed(1)} Mo)…`;
+    const insert = (markup) => repeat(() => {
+      sink.innerHTML = markup;
+      void sink.offsetHeight;
+      sink.textContent = "";
+    }, Math.min(runs, 2));
+
+    const domCost = await insert(html);
+    phases.push(["insertion DOM + mise en page", domCost]);
+
+    // What `technicalPanel: "lazy"` buys. The row above is the default, which
+    // writes the panel out in full; this is the opt-in alternative, and the
+    // reason the option exists — two thirds of the nodes are a collapsed panel
+    // whose content is built even though it skips layout. Measured rather than
+    // extrapolated from the node count, because DOM cost is not proportional
+    // to it: the nodes fall 58 % and the time rather less.
+    const lazyHtml = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
+    // Kept out of `phases`: it replaces the row above rather than adding to it,
+    // and counting it in the pipeline would inflate every share.
+    const variant = [
+      `insertion DOM — technicalPanel "lazy" (${size(lazyHtml.length)})`,
+      await insert(lazyHtml),
+    ];
+
+    const endToEnd = await repeat(
+      async () => void (await renderPackageToHtml(await loadReqIfPackage(raw))),
+      Math.min(runs, 2),
+    );
+
+    return {
+      name,
+      bytes: raw.length,
+      objects: doc.coreContent.specObjects.length,
+      htmlBytes: html.length,
+      nodes: (() => { sink.innerHTML = html; const n = sink.querySelectorAll("*").length; sink.textContent = ""; return n; })(),
+      phases,
+      variant,
+      endToEnd,
+      dom: domCost,
+      runs,
+    };
+  }
+
+  function report(r) {
+    // What the user waits through is the pipeline *plus* putting the result on
+    // screen. Dividing by the pipeline alone made the DOM row read "201 %" —
+    // a share of a total it was not part of.
+    const total = r.endToEnd + r.dom;
+
+    // Phases are timed in runs of their own, separate from the total, so noise
+    // can push one past it — printed here as "106 %". The guard targets that
+    // impossibility directly rather than comparing sums: a sum *below* the
+    // total is expected and legitimate ("rendu" times one specification out of
+    // several), and on a single-specification file the sum equals the total by
+    // construction, so a sum-based test would flicker on the largest case. An
+    // absolute floor covers fixtures too small to time at all.
+    const attributable = total >= 20 && Math.max(...r.phases.map(([, t]) => t)) <= total;
+    const share = (t) => (attributable ? `${((t / total) * 100).toFixed(0)} %` : "—");
+
+    const row = ([label, t], cls = "") =>
+      `<tr class="${cls}"><td>${label}</td><td>${ms(t)} ms</td><td>${share(t)}</td></tr>`;
+
+    const table = document.createElement("table");
+    table.innerHTML = `
+      <caption>${r.name}
+        <span class="note">— ${size(r.bytes)} · ${r.objects.toLocaleString("fr-FR")} SpecObject ·
+        ${size(r.htmlBytes)} de HTML · ${r.nodes.toLocaleString("fr-FR")} nœuds DOM
+        (${Math.round(r.nodes / r.objects)} par exigence) · min sur ${r.runs}</span>
+      </caption>
+      <thead><tr><th>phase</th><th>min</th><th>part</th></tr></thead>
+      <tbody>${r.phases.map((p) => row(p)).join("")}
+        <tr class="total"><td>total à l'écran</td><td>${ms(total)} ms</td><td></td></tr>
+        ${row(r.variant, "variant")}
+      </tbody>`;
+    out.append(table);
+  }
+
+  const cases = ["sample.reqif", "sample.reqifz", "AEB_Platform_Requirements_TestDataset.reqif", ".bench/synthetic-50mb.reqif"];
+  for (const name of cases) {
+    try {
+      report(await runCase(name));
+    } catch (error) {
+      const p = document.createElement("p");
+      p.className = "note";
+      p.textContent = `${name} — ignoré : ${error.message}`;
+      out.append(p);
+    }
+  }
+
+  const legend = document.createElement("p");
+  legend.className = "note";
+  legend.innerHTML = `
+    Les parts se rapportent au <em>total à l'écran</em> — pipeline plus insertion dans le DOM,
+    c'est-à-dire l'attente réellement subie. La ligne <em>lazy</em>, sous le total, est une
+    <strong>variante de l'insertion DOM</strong> et non une étape de plus : c'est ce que coûterait
+    l'affichage en différant le panneau technique, au lieu de l'écrire en entier comme le fait le
+    défaut. « — » : décomposition jugée non fiable pour ce cas — total trop court, ou phases dont
+    la somme dépasse le total, ce qui ne peut venir que du bruit d'horloge.`;
+  out.append(legend);
+
+  status.innerHTML = longTaskSupported
+    ? `Terminé. <strong>Plus longue tâche ininterrompue : ${ms(longest)} ms.</strong>
+       <span class="note">C'est la durée pendant laquelle l'onglet ne répond plus — clic, scroll et
+       animation compris — et non le total cumulé.</span>`
+    : `Terminé. <span class="note">Plus longue tâche non mesurée : ce navigateur n'expose pas
+       l'observateur <code>longtask</code>. À relire sous Chrome ou Edge.</span>`;
+</script>

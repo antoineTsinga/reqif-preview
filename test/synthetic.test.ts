@@ -81,14 +81,26 @@ describe("synthetic fixture: simple mode vs technical details", () => {
     expect(html).toContain("The user shall be able to");
   });
 
-  it("hides technical attributes behind a closed <details> toggle by default", async () => {
+  it("hides technical attributes behind a closed <details> toggle in eager mode", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    const html = await renderPackageToHtml(pkg, { includeCss: false, technicalPanel: "eager" });
     expect(html).toContain('<details class="reqif-technical">'); // no "open" attribute
     expect(html).not.toContain('<details class="reqif-technical" open>');
     expect(html).toContain("Technical details");
     // The technical attribute names (e.g. "Count", "Ratio") must still be present,
     // just nested inside the collapsed panel rather than shown unconditionally.
+    expect(html).toContain("Count");
+    expect(html).toContain("Ratio");
+  });
+
+  it("defers the same panel on request, keeping its content reachable", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, technicalPanel: "lazy" });
+    // Opting in: the toggle is there and the attribute values still travel with
+    // it, but they sit in an inert block so the browser does not build two
+    // thirds of the document's nodes for a panel nobody opened.
+    expect(html).toContain("Technical details");
+    expect(html).toContain('type="application/reqif-panel"');
     expect(html).toContain("Count");
     expect(html).toContain("Ratio");
   });
@@ -401,6 +413,7 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
+      technicalPanel: "eager",
       customAttributeRenderers: [
         { attribute: "IE PUID", render: (v) => (v?.kind === "STRING" ? { dangerouslyRawHtml: `<div class="puid-badge">${v.value}` } : undefined) }, // missing </div>
       ],
@@ -440,6 +453,7 @@ describe("synthetic fixture: customAttributeRenderers fail-safe against broken H
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
       includeCss: false,
+      technicalPanel: "eager",
       customAttributeRenderers: [
         {
           attribute: "IE PUID",
@@ -971,7 +985,10 @@ describe("isTitleless / isContentless (general predicate, not tied to chapters)"
 describe("synthetic fixture: rendering & sanitization", () => {
   it("escapes/strips dangerous markup and keeps safe formatting", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    // technicalPanel: "off" so the library emits no script of its own, which
+    // keeps this assertion absolute: not one <script> anywhere. The default
+    // mode is checked separately below, where the claim has to be narrower.
+    const html = await renderPackageToHtml(pkg, { includeCss: false, technicalPanel: "off" });
 
     expect(html).not.toContain("<script");
     expect(html).not.toContain("alert(");
@@ -979,6 +996,41 @@ describe("synthetic fixture: rendering & sanitization", () => {
     expect(html).toContain("<strong>log in</strong>");
     expect(html).toContain("text-decoration:underline"); // kept
     expect(html).not.toContain("display:none"); // stripped
+  });
+
+  it("emits no script at all by default", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    // The fixture carries a <script>alert(1)</script> payload, and the default
+    // render adds none of its own -- so the absolute claim holds here.
+    expect(await renderPackageToHtml(pkg, { includeCss: false })).not.toMatch(/<script/i);
+  });
+
+  it("emits only its own scripts once lazy panels are asked for", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, technicalPanel: "lazy" });
+
+    // The fixture carries a <script>alert(1)</script> payload. Now that the
+    // renderer emits scripts of its own, "contains no <script>" can no longer
+    // express the invariant that matters, so state it precisely: every script
+    // in the output is one of ours, and the payload is still gone.
+    const scripts = html.match(/<script(?:\s[^>]*)?>/gi) ?? [];
+    expect(scripts.length).toBeGreaterThan(0);
+    // Every one of them is an inert data block: includeJs is off by default, so
+    // the output carries no executable <script> at all.
+    for (const tag of scripts) {
+      expect(tag).toBe('<script type="application/reqif-panel">');
+    }
+    expect(html).not.toContain("alert(");
+    expect(html).not.toContain("javascript:");
+
+    // And the payload must not be hiding inside the inert block either, where
+    // it would be inserted into the DOM the moment a panel is opened.
+    for (const [, payload] of html.matchAll(
+      /<script type="application\/reqif-panel">([\s\S]*?)<\/script>/g,
+    )) {
+      expect(payload).not.toContain("alert(");
+      expect(payload).not.toMatch(/<script/i);
+    }
   });
 
   it("resolves the enumeration value to its long name", async () => {

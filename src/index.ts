@@ -33,3 +33,4 @@ export {
 } from "./render.js";
 export { renderXhtmlContent, type AttachmentLookup, type XhtmlRenderOptions } from "./sanitize.js";
 export { DEFAULT_CSS } from "./styles.js";
+export { DEFAULT_JS, expandLazyPanels } from "./script.js";

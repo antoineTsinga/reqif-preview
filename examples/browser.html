@@ -23,7 +23,11 @@
 
   <!-- En usage réel : import depuis "reqif-preview" après npm install. -->
   <script type="module">
-    import { loadReqIfPackage, renderPackageToHtml } from "../dist/index.js";
+    import { loadReqIfPackage, renderPackageToHtml, expandLazyPanels } from "../dist/index.js";
+
+    // innerHTML n'exécute jamais un <script> inséré : le déployeur des panneaux
+    // techniques paresseux doit donc être installé d'ici. Une fois suffit.
+    expandLazyPanels();
 
     const drop = document.getElementById("drop");
     const status = document.getElementById("status");

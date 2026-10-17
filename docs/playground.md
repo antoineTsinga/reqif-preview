@@ -10,8 +10,8 @@ pageClass: sandbox-page
 # Playground
 
 This page runs **the real library**, in your browser, on the file of your choosing. The
-bundle loaded here is the one `npm run build` produced when the site was published: what
-you see is what the code does today.
+bundle loaded here is the published package itself, not a demo build: what you see is what
+the code does today.
 
 Nothing is sent anywhere — there is no server behind this page. Your file is read by
 `FileReader` and processed locally.

@@ -130,18 +130,32 @@ const renderOptions = computed(() => {
 
 const changedCount = computed(() => Object.keys(renderOptions.value).length);
 
-/** The snippet that reproduces exactly what the preview pane is showing. */
+/**
+ * The snippet that reproduces exactly what the preview pane is showing.
+ *
+ * expandLazyPanels() appears only when the options actually need it. With the
+ * default technicalPanel: "eager" the panel is written out and nothing has to
+ * be called; under "lazy" it does, because innerHTML never runs the inline
+ * expander. Showing the call unconditionally would teach a step that is not
+ * required, and hiding it under "lazy" would hand the reader a copy of this
+ * page whose panels stay shut.
+ */
 const snippet = computed(() => {
   const entries = Object.entries(renderOptions.value);
-  const head = `import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
+  const needsExpander = (renderOptions.value as Record<string, unknown>).technicalPanel === "lazy";
+  const imports = ["loadReqIfPackage", "renderPackageToHtml", ...(needsExpander ? ["expandLazyPanels"] : [])];
+  const head = `import { ${imports.join(", ")} } from "reqif-preview";
 
 const pkg = await loadReqIfPackage(bytes);
 `;
-  if (entries.length === 0) {
-    return `${head}const html = await renderPackageToHtml(pkg);`;
-  }
-  const body = entries.map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n");
-  return `${head}const html = await renderPackageToHtml(pkg, {\n${body}\n});`;
+  const call =
+    entries.length === 0
+      ? `const html = await renderPackageToHtml(pkg);`
+      : `const html = await renderPackageToHtml(pkg, {\n` +
+        entries.map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n") +
+        `\n});`;
+  const tail = needsExpander ? `\n\npreview.innerHTML = html;\nexpandLazyPanels();` : "";
+  return `${head}${call}${tail}`;
 });
 
 /** Grouped, because dropped-tag alone can fire thousands of times. */
@@ -166,6 +180,11 @@ async function render() {
       onDegradation: (e) => collected.push(e as Degradation),
     } as never);
     events.value = collected;
+    // v-html is innerHTML, which never runs an inline <script> — so the
+    // library's own expander has to be installed from here, or the lazy
+    // technical panels would open onto their "needs JavaScript" message.
+    // Idempotent: one document-level listener, however often this runs.
+    lib.value.expandLazyPanels?.();
     status.value = `${fileName.value} — ${t.value.renderedAt} ${new Date().toLocaleTimeString(lang.value)}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);

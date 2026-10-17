@@ -48,6 +48,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "bench": "npm run build && node scripts/benchmark.mjs",
+    "bench:browser": "npm run build && node scripts/benchmark-browser.mjs",
     "docs:dev": "npm run build && node scripts/sync-docs-assets.mjs && vitepress dev docs",
     "docs:build": "npm run build && node scripts/sync-docs-assets.mjs && node scripts/check-docs.mjs && node scripts/check-doc-examples.mjs && vitepress build docs",
     "docs:preview": "vitepress preview docs",

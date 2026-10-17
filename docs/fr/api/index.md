@@ -53,8 +53,10 @@ poursuivent. Pour savoir *ce qui* a été dégradé, voir [Diagnostics](/fr/api/
 ## Feuille de style
 
 Le rendu embarque sa propre feuille de style dans un `<style>` en tête du HTML retourné,
-scopée sur `.reqif-preview`. Il n'y a donc rien à importer ni à lier : c'est ce qui rend la
-sortie autonome, insérable telle quelle avec `innerHTML`.
+scopée sur `.reqif-preview`. Il n'y a donc rien à importer ni à lier pour l'habillage : la
+sortie est insérable telle quelle avec `innerHTML` et s'affichera correctement. Une seule
+chose demande un appel plutôt que du balisage — l'ouverture d'un panneau technique
+paresseux, traitée juste en dessous.
 
 Pour la fournir vous-même — cas d'une politique de sécurité de contenu (CSP) interdisant
 les `<style>` inline, ou d'un thème maison :
@@ -91,3 +93,67 @@ cette feuille.
 une page au thème sombre, l'aperçu serait illisible : c'est à l'hôte de fournir une surface
 claire.
 :::
+
+## Panneau technique
+
+Chaque exigence porte un panneau « Détails techniques » replié qui liste tous ses
+attributs, et `technicalPanel` décide de la façon dont il est émis.
+
+| Valeur | Ce qu'elle émet | Nœuds par exigence |
+|---|---|---|
+| `"eager"` (défaut) | le panneau, en entier | 69 |
+| `"lazy"` | son balisage dans un bloc inerte, construit à l'ouverture | 29 |
+| `"off"` | rien | 26 |
+
+Le défaut l'écrit, ce qui ne demande aucun JavaScript et rien de votre part. Passez à
+`"lazy"` quand un fichier est assez gros pour que l'écart compte — voir
+[Fichiers lourds](/fr/guide/gros-documents#fichiers-lourds) pour les mesures et pour savoir
+quand ça vaut le coup. `"off"` est plus léger encore si vous ne voulez simplement pas du
+panneau.
+
+### Faire fonctionner les panneaux paresseux
+
+`"lazy"` se demande au lieu d'être le défaut parce qu'il ne fonctionne pas seul, et autant
+le dire sans détour : **un `<script>` inséré via `innerHTML` ne s'exécute jamais**. C'est
+la spécification HTML, pas une bizarrerie de navigateur, et `innerHTML` est la façon dont
+la plupart des pages utilisent cette bibliothèque. Le déployeur doit donc être installé
+séparément :
+
+```ts
+import { renderPackageToHtml, expandLazyPanels } from "reqif-preview";
+
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
+document.getElementById("preview")!.innerHTML = html;
+
+// Une fois, n'importe quand. Elle ne pose qu'un écouteur : l'ordre par rapport
+// à innerHTML n'importe pas -- tôt vaut mieux que tard, cela étant, car un
+// panneau ouvert avant l'écouteur affiche le repli jusqu'à sa réouverture.
+expandLazyPanels();
+```
+
+Si le balisage arrive au contraire dans le document HTML initial — rendu côté serveur, ou
+écrit par `document.write` — un script *peut* s'exécuter de là, et `includeJs` en demande
+un :
+
+```ts
+// Émet le déployeur inline. Rien à appeler : il s'exécute au chargement.
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy", includeJs: true });
+```
+
+Tant que ni l'un ni l'autre n'est en place, l'ouverture d'un panneau affiche le message
+`labels.technicalUnavailable` plutôt que rien du tout — un panneau vide se lit comme un
+viewer cassé, ce qui est la mauvaise chose à dire au lecteur. Ce repli est d'ailleurs la
+raison pour laquelle `"lazy"` n'est pas le défaut : qui n'a rien configuré doit obtenir un
+panneau qui marche, pas un message expliquant ce qu'il n'a pas fait.
+
+Sous une Content-Security-Policy stricte, qui bloque les scripts inline même dans un
+document rendu côté serveur, laissez `includeJs` tranquille et servez vous-même le texte
+que le rendu aurait embarqué, sous un nonce ou un hash :
+
+```ts
+import { DEFAULT_JS } from "reqif-preview";
+```
+
+`DEFAULT_JS` et `expandLazyPanels` font la même chose selon les mêmes règles — le
+premier comme texte que vous pouvez servir sous un nonce ou un hash, le second comme
+fonction à appeler.

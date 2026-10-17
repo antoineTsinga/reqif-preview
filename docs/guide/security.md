@@ -72,6 +72,22 @@ unbalanced tags, but it does not protect against injection: it checks that tags 
 not where the text came from.
 :::
 
-The HTML produced is meant for `innerHTML`. It never contains a `<script>` and executes
-nothing by itself, but it is not designed to be served as-is as a complete HTML document
-to a third party without appropriate security headers.
+The HTML produced is meant for `innerHTML`. **No `<script>` ever comes from the document**
+— the sanitizer removes those with their subtree — and **nothing in the output executes by
+default**.
+
+In fact the default output carries **no `<script>` at all**, of any origin. Two options can
+add one, and neither puts anything from the file inside it:
+
+- `technicalPanel: "lazy"` adds one inert `<script type="application/reqif-panel">` block
+  per requirement. Despite the tag, that is not code: a script block of an unrecognised
+  type is a text container the browser neither parses as HTML nor runs. It holds markup the
+  library generated itself, and the sequence that could end the block early is escaped on
+  the way in.
+- `includeJs: true` adds the expander, which is a fixed string this library ships —
+  readable as `DEFAULT_JS`, identical for every document.
+
+See [Technical panel](/api/#technical-panel).
+
+It is still not designed to be served as-is as a complete HTML document to a third party
+without appropriate security headers.

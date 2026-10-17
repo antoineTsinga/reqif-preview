@@ -26,6 +26,8 @@ The same object is accepted by `renderPackageToHtml`, `renderDocumentToHtml` and
 | `contentAttributes` | `string[]` | — | Strict allow-list of the attributes making up the main content, in this order. [Details](/guide/title-and-content) |
 | `titleAttributes` | `string[]` | — | Attributes tried as a title **as a last resort**, after the `LONG-NAME`s. |
 | `showTechnicalByDefault` | `boolean` | `false` | Opens the "Technical details" panel from the start. |
+| `technicalPanel` | `"eager" \| "lazy" \| "off"` | `"eager"` | How the "Technical details" panel is emitted. `"eager"` writes it out in full, `"lazy"` defers building its nodes until it is opened — which needs `expandLazyPanels()` — and `"off"` omits it. See [Technical panel](/api/#technical-panel) and [Heavy files](/guide/large-documents#heavy-files). |
+| `includeJs` | `boolean` | `false` | Inlines the small script that expands lazy panels. Off by default: a `<script>` inserted through `innerHTML` never executes, so in the browser it could not run. Turn it on when the markup arrives in the initial HTML document, server-rendered. Ignored unless you chose `technicalPanel: "lazy"`. See [Making lazy panels open](/api/#making-lazy-panels-open). |
 | `hideEmptyAttributes` | `boolean` | `true` | Omits attributes with no value at all from the technical panel. |
 | `preferSimplifiedXhtml` | `boolean` | `false` | Shows the simplified version rather than the original. [Details](/guide/simplified-text) |
 | `showRelations` | `boolean` | `true` | Shows incoming/outgoing links. Visible in `readingMode` too. |
@@ -57,24 +59,25 @@ labels you supply are replaced.
 
 ```ts
 interface RenderLabels {
-  noContent: string;              // "(vide)"
-  untitled: string;               // "(sans titre)"
-  idLabel: string;
-  technicalDetails: string;       // "Détails techniques"
-  headerTitle: string;
-  headerSourceTool: string;
-  headerExportedBy: string;
-  headerCreationTime: string;
-  headerComment: string;
-  yes: string;
-  no: string;
-  createdByLabel: string;
-  createdOnLabel: string;
-  modifiedByLabel: string;
-  modifiedOnLabel: string;
-  relationsLabel: string;         // "Liens"
-  relationFallbackType: string;
-  relationUnresolved: string;
+  noContent: string;              // "(empty)"
+  untitled: string;               // "(untitled)"
+  idLabel: string;                // "ID"
+  technicalDetails: string;       // "Technical details"
+  technicalUnavailable: string;   // "Details unavailable — this panel needs JavaScript."
+  headerTitle: string;            // "Title"
+  headerSourceTool: string;       // "Source tool"
+  headerExportedBy: string;       // "Exported by"
+  headerCreationTime: string;     // "Creation date"
+  headerComment: string;          // "Comment"
+  yes: string;                    // "Yes"
+  no: string;                     // "No"
+  createdByLabel: string;         // "Created by"
+  createdOnLabel: string;         // "Created"
+  modifiedByLabel: string;        // "Modified by"
+  modifiedOnLabel: string;        // "Modified"
+  relationsLabel: string;         // "Links"
+  relationFallbackType: string;   // "Relation"
+  relationUnresolved: string;     // "(target not found)"
 }
 ```
 
