@@ -38,6 +38,11 @@ const MESSAGES = {
     fieldsHint: ["Several values separated by commas, in the order you want. Leaving it empty keeps the default behaviour.", "has no effect without"],
     codeHint: "This code produces exactly the preview above. Options left at their default value do not appear in it.",
     noEvents: "No degradation on this file with these options.",
+    heavyTitle: "This file is large",
+    heavyBody:
+      "Rendering it will freeze this tab for several seconds and can take over a gigabyte of memory — peak use runs many times a file's size. Nothing is uploaded either way; the work happens here.",
+    heavyGo: "Render it anyway",
+    heavyLight: "Render without the technical panel",
     thCode: "Code", thCount: "Occurrences", thSample: "Sample message",
     diagHint: ["Fed live by", "The rendering is strictly identical with or without this handler: the option only makes decisions that were already taken visible."],
   },
@@ -58,6 +63,11 @@ const MESSAGES = {
     fieldsHint: ["Plusieurs valeurs séparées par des virgules, dans l'ordre voulu. Laisser vide garde le comportement par défaut.", "n'a d'effet qu'avec"],
     codeHint: "Ce code produit exactement l'aperçu ci-dessus. Les options laissées à leur valeur par défaut n'y apparaissent pas.",
     noEvents: "Aucune dégradation sur ce fichier avec ces options.",
+    heavyTitle: "Ce fichier est volumineux",
+    heavyBody:
+      "Son rendu va figer cet onglet plusieurs secondes et peut demander plus d'un gigaoctet de mémoire — le pic vaut plusieurs fois la taille du fichier. Rien n'est envoyé nulle part dans les deux cas : tout se passe ici.",
+    heavyGo: "Afficher quand même",
+    heavyLight: "Afficher sans le panneau technique",
     thCode: "Code", thCount: "Occurrences", thSample: "Exemple de message",
     diagHint: ["Alimenté en direct par", "Le rendu est strictement identique avec ou sans ce gestionnaire : l'option ne fait que rendre visibles des décisions déjà prises."],
   },
@@ -75,6 +85,20 @@ const pkg = shallowRef<unknown>(null);
 const html = ref("");
 const status = ref("");
 const error = ref("");
+
+/**
+ * A file held back for confirmation, with its bytes, because rendering it would
+ * cost enough to be worth announcing first.
+ */
+const heavy = ref<{ bytes: Uint8Array; name: string } | null>(null);
+
+/**
+ * 15 MB. The threshold is set on memory rather than on time, because memory is what
+ * ends a tab: peak use runs 25 to 56 times the file's size, so 15 MB already means
+ * 0.4 to 0.8 GB. Seconds of freeze are unpleasant; an out-of-memory kill loses the
+ * file. Real exports are rarely above this, so the notice stays rare.
+ */
+const HEAVY_BYTES = 15 * 1024 * 1024;
 const busy = ref(false);
 const fileName = ref("exemple.reqifz");
 const dragging = ref(false);
@@ -94,6 +118,8 @@ const showTechnicalByDefault = ref(false);
 // whatever file a stranger drops on it, and eager rendering of a 50 MB export is
 // 22 s of frozen tab for a panel nobody opened. Visually identical either way.
 const lazyTechnicalPanel = ref(true);
+/** Set when the reader chose to drop the panel on a heavy file. */
+const technicalPanelOff = ref(false);
 const preferSimplifiedXhtml = ref(false);
 const showRelations = ref(true);
 const dateLocale = ref("fr-FR");
@@ -128,7 +154,9 @@ const renderOptions = computed(() => {
   const chapters = list(chapterNumberAttributes.value);
   if (chapters) o.chapterNumberAttributes = chapters;
   if (showTechnicalByDefault.value) o.showTechnicalByDefault = true;
-  if (lazyTechnicalPanel.value) o.technicalPanel = "lazy";
+  // "off" wins: it is the reader's explicit answer to the heavy-file question.
+  if (technicalPanelOff.value) o.technicalPanel = "off";
+  else if (lazyTechnicalPanel.value) o.technicalPanel = "lazy";
   if (preferSimplifiedXhtml.value) o.preferSimplifiedXhtml = true;
   if (!showRelations.value) o.showRelations = false;
   if (dateLocale.value && dateLocale.value !== "fr-FR") o.dateLocale = dateLocale.value;
@@ -206,6 +234,17 @@ async function render() {
 
 async function loadBytes(bytes: Uint8Array, name: string) {
   if (!lib.value) return;
+  // The "without the technical panel" answer was about one heavy file, not a
+  // standing preference: a small file loaded afterwards gets the panel back.
+  technicalPanelOff.value = false;
+  // Announce the cost before paying it. Parsing alone would already block, so the
+  // question has to come before loadReqIfPackage, not before the render.
+  if (bytes.length > HEAVY_BYTES) {
+    heavy.value = { bytes, name };
+    error.value = "";
+    html.value = "";
+    return;
+  }
   busy.value = true;
   error.value = "";
   try {
@@ -214,6 +253,26 @@ async function loadBytes(bytes: Uint8Array, name: string) {
     await render();
   } catch (e) {
     // Parsing is the one stage that does throw — everything after it degrades.
+    error.value = e instanceof Error ? e.message : String(e);
+    html.value = "";
+    busy.value = false;
+  }
+}
+
+/** Proceed with the held-back file, optionally dropping the technical panel. */
+async function renderHeavy(withoutTechnical: boolean) {
+  const file = heavy.value;
+  if (!file) return;
+  heavy.value = null;
+  if (withoutTechnical) technicalPanelOff.value = true;
+  if (!lib.value) return;
+  busy.value = true;
+  error.value = "";
+  try {
+    pkg.value = await lib.value.loadReqIfPackage(file.bytes);
+    fileName.value = file.name;
+    await render();
+  } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     html.value = "";
     busy.value = false;
@@ -252,6 +311,8 @@ function reset() {
   chapterNumbers.value = false;
   chapterNumberAttributes.value = "";
   showTechnicalByDefault.value = false;
+  lazyTechnicalPanel.value = true;
+  technicalPanelOff.value = false;
   preferSimplifiedXhtml.value = false;
   showRelations.value = true;
   dateLocale.value = "fr-FR";
@@ -391,6 +452,20 @@ watch(renderOptions, render, { deep: true });
       </button>
       <span class="pg-status">{{ busy ? t.rendering : status || t.loading }}</span>
     </nav>
+
+    <div v-if="heavy" class="pg-heavy">
+      <p class="pg-heavy-title">
+        {{ t.heavyTitle }} — <strong>{{ heavy.name }}</strong>,
+        {{ (heavy.bytes.length / 1048576).toFixed(1) }} Mo
+      </p>
+      <p class="pg-heavy-body">{{ t.heavyBody }}</p>
+      <p class="pg-heavy-actions">
+        <button class="pg-btn" type="button" @click="renderHeavy(true)">{{ t.heavyLight }}</button>
+        <button class="pg-btn pg-btn-ghost" type="button" @click="renderHeavy(false)">
+          {{ t.heavyGo }}
+        </button>
+      </p>
+    </div>
 
     <p v-if="error" class="pg-error">{{ error }}</p>
 
@@ -628,6 +703,21 @@ watch(renderOptions, render, { deep: true });
   color: var(--vp-c-danger-1);
   background: var(--vp-c-danger-soft);
 }
+/* A warning, not an error: the file is fine, the cost is the news. */
+.pg-heavy {
+  padding: 12px 18px 14px;
+  background: var(--vp-c-warning-soft);
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+.pg-heavy-title { margin: 0; font-size: 14px; color: var(--vp-c-text-1); }
+.pg-heavy-body {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--vp-c-text-2);
+  max-width: 68ch;
+}
+.pg-heavy-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
 .pg-render {
   max-height: 78vh;
   overflow: auto;
