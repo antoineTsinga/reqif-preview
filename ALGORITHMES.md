@@ -383,7 +383,7 @@ for (const value of obj.values) {
 
 Ce panneau est **volontairement jamais filtré** par la détection de cycle de vie : c'est la zone "transparence totale", qui liste tout, même ce qui est déjà résumé ailleurs (voir section 9).
 
-C'est cette exhaustivité qui en fait le poste le plus lourd de la sortie — deux tiers des nœuds émis — et donc la raison pour laquelle `renderTechnicalPanel` ne l'écrit plus en clair par défaut. Les lignes ci-dessus sont construites de façon identique dans les trois modes de `technicalPanel` ; seule leur destination change : écrites dans le DOM (`"eager"`), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`, le défaut), ou abandonnées (`"off"`). La mesure qui a motivé ce choix est en §11.
+C'est cette exhaustivité qui en fait le poste le plus lourd de la sortie — deux tiers des nœuds émis — et donc l'objet de l'option `technicalPanel`. Les lignes ci-dessus sont construites de façon identique dans ses trois modes ; seule leur destination change : écrites dans le DOM (`"eager"`, le défaut), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`), ou abandonnées (`"off"`). La mesure qui a motivé cette option est en §11.
 
 ### Onglets sans JavaScript, numérotation, mode lecture
 
@@ -528,17 +528,19 @@ Deux corrections s'imposent en revanche à l'intuition que le reste du document 
 
 ### Ce que la mesure a changé dans le code
 
-C'est la seconde observation qui a été corrigée, et elle explique la forme actuelle de §8. L'option `technicalPanel` vaut désormais `"lazy"` par défaut : le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
+C'est la seconde observation qui a été traitée, et elle explique l'option `technicalPanel` de §8. En mode `"lazy"`, le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
 
 | Mode | Nœuds DOM (DOORS) | Par exigence | Octets |
 |---|---|---|---|
-| `"eager"` (ancien comportement) | 70 230 | 69 | 3,76 Mo |
-| `"lazy"` (défaut actuel) | **29 787** | **29** | 3,87 Mo |
+| `"eager"` (défaut) | 70 230 | 69 | 3,76 Mo |
+| `"lazy"` | **29 787** | **29** | 3,87 Mo |
 | `"off"` | 26 714 | 26 | 1,58 Mo |
 
 Le balisage est toujours transmis : la sortie est donc ~3 % **plus grosse** en octets. Le gain est à l'analyse et à la mise en page, pas au transfert — c'est-à-dire précisément là où la mesure a trouvé le coût.
 
 Le déploiement demande du JavaScript, ce qui est une première pour cette bibliothèque : les onglets, eux, reposent sur `:target` et n'en demandent aucun (§8). Deux chemins le fournissent, parce qu'un seul ne suffit pas — un `<script>` inséré via `innerHTML` ne s'exécute jamais, ce qui est la spécification HTML. L'export `expandLazyPanels()` couvre donc le navigateur, et l'option `includeJs: true` émet une copie inline pour un document rendu côté serveur. Un panneau dont ni l'un ni l'autre n'a été mis en place s'ouvre sur le message `labels.technicalUnavailable`, jamais sur du vide.
+
+C'est précisément cette dépendance qui empêche `"lazy"` d'être le défaut, malgré ses chiffres. Un défaut doit être correct pour qui n'a rien lu : rendre, affecter à `innerHTML`, et voir le résultat. Avec `"lazy"` par défaut, ce code minimal produisait des panneaux s'ouvrant sur un message d'indisponibilité — un gain de performance payé par une apparence de bogue chez tous ceux qui n'en avaient pas besoin. L'optimisation se demande ; le défaut fonctionne.
 
 ---
 

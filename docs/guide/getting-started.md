@@ -18,7 +18,7 @@ npm install reqif-preview
 ## Quick start
 
 ```ts
-import { loadReqIfPackage, renderPackageToHtml, expandLazyPanels } from "reqif-preview";
+import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
 
 // The bytes of your file. From a URL:
 const fileBytes = new Uint8Array(await (await fetch("/requirements.reqifz")).arrayBuffer());
@@ -30,11 +30,6 @@ const pkg = await loadReqIfPackage(fileBytes);
 
 const html = await renderPackageToHtml(pkg);
 document.getElementById("preview").innerHTML = html;
-
-// Lets the "Technical details" panels open: innerHTML never runs an inline
-// <script>, so the library cannot do this itself. Once is enough, and it only
-// installs a listener -- so this can sit anywhere, before or after the insert.
-expandLazyPanels();
 ```
 
 That is all there is to the simple case: `loadReqIfPackage` works out on its own

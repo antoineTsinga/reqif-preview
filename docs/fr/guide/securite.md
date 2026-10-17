@@ -76,17 +76,19 @@ Le HTML produit est destiné à `innerHTML`. **Aucun `<script>` ne provient jama
 document** — l'assainisseur les supprime avec leur sous-arbre — et **rien dans la sortie
 ne s'exécute par défaut**.
 
-Ce que la sortie porte, depuis que le panneau technique paresseux est le défaut, c'est un
-bloc inerte `<script type="application/reqif-panel">` par exigence. Malgré la balise, ce
-n'est pas du code : un bloc script dont le type n'est pas reconnu est un conteneur de
-texte que le navigateur n'analyse pas comme du HTML et n'exécute pas. Il contient du
-balisage que la bibliothèque a produit elle-même, et la séquence qui pourrait refermer le
-bloc prématurément est échappée à l'entrée.
+De fait, la sortie par défaut ne porte **aucun `<script>`**, quelle qu'en soit l'origine.
+Deux options peuvent en ajouter un, et ni l'une ni l'autre n'y met quoi que ce soit venant
+du fichier :
 
-Un script exécutable n'apparaît que si vous en demandez un avec `includeJs: true`, et lui
-non plus ne contient rien venant du fichier. Pour une sortie sans aucun `<script>`,
-`technicalPanel: "eager"` ou `"off"` donne exactement cela — voir
-[Panneau technique](/fr/api/#panneau-technique).
+- `technicalPanel: "lazy"` ajoute un bloc inerte `<script type="application/reqif-panel">`
+  par exigence. Malgré la balise, ce n'est pas du code : un bloc script dont le type n'est
+  pas reconnu est un conteneur de texte que le navigateur n'analyse pas comme du HTML et
+  n'exécute pas. Il contient du balisage que la bibliothèque a produit elle-même, et la
+  séquence qui pourrait refermer le bloc prématurément est échappée à l'entrée.
+- `includeJs: true` ajoute le déployeur, qui est une chaîne fixe livrée par cette
+  bibliothèque — lisible via `DEFAULT_JS`, identique pour tous les documents.
+
+Voir [Panneau technique](/fr/api/#panneau-technique).
 
 Cela reste non conçu pour être servi tel quel comme document HTML complet à un tiers sans
 en-têtes de sécurité appropriés.

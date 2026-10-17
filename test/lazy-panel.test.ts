@@ -26,10 +26,23 @@ function panelPayload(html: string): string {
 }
 
 describe("technicalPanel: deferring the panel nobody has opened", () => {
-  it("defaults to lazy, and cuts the nodes a browser must build", async () => {
+  it("defaults to eager, so the plainest code needs nothing extra", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const lazy = await renderPackageToHtml(pkg);
-    const eager = await renderPackageToHtml(pkg, { technicalPanel: "eager" });
+    const html = await renderPackageToHtml(pkg);
+
+    // Lazy mode cannot work without expandLazyPanels() or includeJs, so as a
+    // default it would hand anyone who read nothing a panel that opens onto
+    // "needs JavaScript". The optimisation is opt-in; the default just works.
+    expect(body(html)).not.toContain(LAZY_ATTR);
+    expect(body(html)).not.toContain(PANEL_SCRIPT_TYPE);
+    expect(body(html)).toContain('<details class="reqif-technical">');
+    expect(html).not.toMatch(/<script/i);
+  });
+
+  it("cuts the nodes a browser must build when asked for lazy", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const lazy = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
+    const eager = await renderPackageToHtml(pkg);
 
     expect(body(lazy)).toContain(LAZY_ATTR);
     expect(body(eager)).not.toContain(LAZY_ATTR);
@@ -39,8 +52,8 @@ describe("technicalPanel: deferring the panel nobody has opened", () => {
 
   it("defers exactly the markup that eager mode writes inline", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const lazy = await renderPackageToHtml(pkg);
-    const eager = await renderPackageToHtml(pkg, { technicalPanel: "eager" });
+    const lazy = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
+    const eager = await renderPackageToHtml(pkg);
 
     // What hydration will insert must be what eager mode would have shown —
     // otherwise opening a panel reveals something different from the old
@@ -59,9 +72,12 @@ describe("technicalPanel: deferring the panel nobody has opened", () => {
     expect(domTagCount(off)).toBeLessThan(domTagCount(await renderPackageToHtml(pkg)));
   });
 
-  it("renders eagerly when the panel is open from the start", async () => {
+  it("overrides lazy when the panel is open from the start", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml(pkg, { showTechnicalByDefault: true });
+    const html = await renderPackageToHtml(pkg, {
+      technicalPanel: "lazy",
+      showTechnicalByDefault: true,
+    });
 
     // An expanded panel is on screen immediately, so deferring it would only
     // add a hydration step before showing what was already asked for.
@@ -78,8 +94,10 @@ describe("the inline script", () => {
 
     // Off by default: innerHTML never executes an inserted <script>, so in the
     // common case an inlined copy is bytes that can never run.
-    expect(await renderPackageToHtml(pkg)).not.toMatch(inline);
-    expect(await renderPackageToHtml(pkg, { includeJs: true })).toMatch(inline);
+    expect(await renderPackageToHtml(pkg, { technicalPanel: "lazy" })).not.toMatch(inline);
+    expect(await renderPackageToHtml(pkg, { technicalPanel: "lazy", includeJs: true })).toMatch(inline);
+    // And asking for it without lazy gets nothing: there is no panel to expand.
+    expect(await renderPackageToHtml(pkg, { includeJs: true })).not.toMatch(inline);
   });
 
   it("is refused where it would have nothing to do", async () => {
@@ -90,14 +108,20 @@ describe("the inline script", () => {
     // would be a CSP violation in exchange for nothing.
     expect(await renderPackageToHtml(pkg, { includeJs: true, technicalPanel: "eager" })).not.toMatch(inline);
     expect(await renderPackageToHtml(pkg, { includeJs: true, technicalPanel: "off" })).not.toMatch(inline);
-    expect(await renderPackageToHtml(pkg, { includeJs: true, showTechnicalByDefault: true })).not.toMatch(inline);
+    expect(
+      await renderPackageToHtml(pkg, {
+        includeJs: true,
+        technicalPanel: "lazy",
+        showTechnicalByDefault: true,
+      }),
+    ).not.toMatch(inline);
   });
 
   it("ships once per package, not once per document", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(
       { ...pkg, documents: [pkg.document, pkg.document] },
-      { includeJs: true },
+      { technicalPanel: "lazy", includeJs: true },
     );
 
     expect(html.match(/<script>\(function\(\)/g)).toHaveLength(1);
@@ -143,13 +167,16 @@ describe("the inert block cannot be broken out of", () => {
 
   it("leaves a rendered document with no way out of the block", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml(pkg);
+    // Both script-producing options on, since the default emits none at all and
+    // the check would pass on 0 === 0 without testing anything.
+    const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy", includeJs: true });
 
     // Every </script> in the output must be one we opened: the inline script
     // and the inert blocks. A stray one would close a block early and spill
     // raw markup into the page.
-    const opens = (html.match(/<script\b/gi) ?? []).length;
+    const opens = (html.match(/<script(?:\s[^>]*)?>/gi) ?? []).length;
     const closes = (html.match(/<\/script>/gi) ?? []).length;
+    expect(opens).toBeGreaterThan(1);
     expect(closes).toBe(opens);
   });
 });
@@ -158,6 +185,7 @@ describe("the no-JavaScript fallback", () => {
   it("carries a translatable message in the marker attribute", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
+      technicalPanel: "lazy",
       labels: { technicalUnavailable: "Besoin de JS" },
     });
 
@@ -167,6 +195,7 @@ describe("the no-JavaScript fallback", () => {
   it("escapes a message containing a quotation mark", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const html = await renderPackageToHtml(pkg, {
+      technicalPanel: "lazy",
       labels: { technicalUnavailable: `say "no"` },
     });
 

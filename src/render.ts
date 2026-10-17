@@ -121,7 +121,8 @@ export interface RenderOptions {
    * Off by default because **a `<script>` inserted through `innerHTML` never
    * executes**, so in the browser — the common case, and what the quick start
    * shows — an inlined copy would be bytes that can never run, plus a
-   * Content-Security-Policy violation for nothing.
+   * Content-Security-Policy violation for nothing. It is also moot unless you
+   * opted into `technicalPanel: "lazy"`, which is not the default.
    *
    * Turn it on when the markup reaches the page some other way: a
    * server-rendered document, or `document.write`. There the script arrives in
@@ -131,20 +132,21 @@ export interface RenderOptions {
   /**
    * How each requirement's technical-details panel is emitted.
    *
-   * - `"lazy"` (default) ships the panel's markup inside an inert
+   * - `"eager"` (default) writes the panel out in full. No JavaScript at all,
+   *   and nothing for the caller to do.
+   * - `"lazy"` ships the panel's markup inside an inert
    *   `<script type="application/reqif-panel">` block and builds it when the
-   *   panel is first opened. Measurement showed the panel to be two thirds of
-   *   all emitted nodes, and inserting nodes into the DOM to be the single
-   *   largest cost of displaying a document — so the panel was the majority of
-   *   the price, paid upfront, for something nobody had asked to see yet.
-   * - `"eager"` writes the panel out in full, as every version before this
-   *   option did. No JavaScript involved.
+   *   panel is first opened. The panel is two thirds of all emitted nodes, and
+   *   inserting nodes into the DOM is the largest cost of displaying a
+   *   document, so this roughly halves the wait on a heavy file.
    * - `"off"` omits it entirely.
    *
-   * `"lazy"` needs the inline script to run, or `expandLazyPanels()` to
-   * be called — notably when you assign the HTML with `innerHTML`, which never
-   * executes an inline script. Until then the panel opens onto the
-   * `labels.technicalUnavailable` message rather than onto nothing.
+   * `"lazy"` is **opt-in rather than the default** because it does not work on
+   * its own: it needs `expandLazyPanels()` called, or `includeJs: true` on a
+   * server-rendered page. Defaulting to it would mean the plainest possible
+   * code — render, assign to `innerHTML` — produced panels that open onto the
+   * `labels.technicalUnavailable` message. A default has to be correct for
+   * someone who has read nothing; an optimisation can ask to be understood.
    */
   technicalPanel?: "lazy" | "eager" | "off";
   /** Override the package's own attachment resolver. */
@@ -295,7 +297,7 @@ const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
  * Content-Security-Policy violation for nothing.
  */
 function scriptTag(options: RenderOptions): string {
-  const lazy = (options.technicalPanel ?? "lazy") === "lazy" && !options.showTechnicalByDefault;
+  const lazy = (options.technicalPanel ?? "eager") === "lazy" && !options.showTechnicalByDefault;
   if (!lazy || options.includeJs !== true) return "";
   return `<script>${DEFAULT_JS}</script>`;
 }
@@ -889,7 +891,7 @@ function renderTechnicalPanel(
 
   if (rows.length === 0) return "";
 
-  const mode = options.technicalPanel ?? "lazy";
+  const mode = options.technicalPanel ?? "eager";
   if (mode === "off") return "";
 
   const openAttr = options.showTechnicalByDefault ? " open" : "";

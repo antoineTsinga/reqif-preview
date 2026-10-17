@@ -97,39 +97,32 @@ claire.
 ## Panneau technique
 
 Chaque exigence porte un panneau « Détails techniques » replié qui liste tous ses
-attributs. La mesure a montré qu'il représente **les deux tiers des nœuds** émis par le
-rendu, et que l'insertion des nœuds dans le DOM est le poste le plus coûteux de
-l'affichage — la moitié de l'attente sur un export de 5 Mo, 70 % sur un de 50 Mo. Le
-panneau était donc la majorité du prix, payée d'avance, pour quelque chose que personne
-n'avait demandé à voir.
+attributs, et `technicalPanel` décide de la façon dont il est émis.
 
-Par défaut son balisage voyage donc dans un bloc inerte et ne devient de vrais nœuds qu'à
-l'ouverture :
+| Valeur | Ce qu'elle émet | Nœuds par exigence |
+|---|---|---|
+| `"eager"` (défaut) | le panneau, en entier | 69 |
+| `"lazy"` | son balisage dans un bloc inerte, construit à l'ouverture | 29 |
+| `"off"` | rien | 26 |
 
-```ts
-// Le défaut. Équivaut à ne rien passer.
-const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
-```
-
-Sur ce même export de 5 Mo, les nœuds que le navigateur doit construire passent de 69 par
-exigence à 29. Le balisage est toujours transmis : la sortie est donc environ 3 % **plus
-grosse** en octets — le gain est à l'analyse et à la mise en page, pas au transfert.
-
-`"eager"` rétablit le comportement de toutes les versions antérieures à cette option, sans
-aucun JavaScript. `"off"` omet le panneau entièrement, ce qui est plus léger encore si vous
-n'en avez pas besoin.
+Le défaut l'écrit, ce qui ne demande aucun JavaScript et rien de votre part. Passez à
+`"lazy"` quand un fichier est assez gros pour que l'écart compte — voir
+[Fichiers lourds](/fr/guide/gros-documents#fichiers-lourds) pour les mesures et pour savoir
+quand ça vaut le coup. `"off"` est plus léger encore si vous ne voulez simplement pas du
+panneau.
 
 ### Faire fonctionner les panneaux paresseux
 
-Le mode paresseux a besoin que son script s'exécute, et **un `<script>` inséré via
-`innerHTML` ne s'exécute jamais** — c'est la spécification HTML, pas une bizarrerie de
-navigateur. Comme `innerHTML` est la façon dont la plupart des pages utilisent cette
-bibliothèque, le script doit être installé séparément :
+`"lazy"` se demande au lieu d'être le défaut parce qu'il ne fonctionne pas seul, et autant
+le dire sans détour : **un `<script>` inséré via `innerHTML` ne s'exécute jamais**. C'est
+la spécification HTML, pas une bizarrerie de navigateur, et `innerHTML` est la façon dont
+la plupart des pages utilisent cette bibliothèque. Le déployeur doit donc être installé
+séparément :
 
 ```ts
 import { renderPackageToHtml, expandLazyPanels } from "reqif-preview";
 
-const html = await renderPackageToHtml(pkg);
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
 document.getElementById("preview")!.innerHTML = html;
 
 // Une fois, n'importe quand. Elle ne pose qu'un écouteur : l'ordre par rapport
@@ -144,16 +137,14 @@ un :
 
 ```ts
 // Émet le déployeur inline. Rien à appeler : il s'exécute au chargement.
-const html = await renderPackageToHtml(pkg, { includeJs: true });
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy", includeJs: true });
 ```
-
-Il est désactivé par défaut précisément à cause de la règle ci-dessus : dans le navigateur
-la copie inline ne pourrait jamais s'exécuter, ce seraient donc des octets inatteignables
-dans chaque sortie, et une violation de Content-Security-Policy en échange de rien.
 
 Tant que ni l'un ni l'autre n'est en place, l'ouverture d'un panneau affiche le message
 `labels.technicalUnavailable` plutôt que rien du tout — un panneau vide se lit comme un
-viewer cassé, ce qui est la mauvaise chose à dire au lecteur.
+viewer cassé, ce qui est la mauvaise chose à dire au lecteur. Ce repli est d'ailleurs la
+raison pour laquelle `"lazy"` n'est pas le défaut : qui n'a rien configuré doit obtenir un
+panneau qui marche, pas un message expliquant ce qu'il n'a pas fait.
 
 Sous une Content-Security-Policy stricte, qui bloque les scripts inline même dans un
 document rendu côté serveur, laissez `includeJs` tranquille et servez vous-même le texte

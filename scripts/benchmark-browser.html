@@ -144,18 +144,18 @@
     const domCost = await insert(html);
     phases.push(["insertion DOM + mise en page", domCost]);
 
-    // What the default used to cost. `technicalPanel` now defaults to "lazy",
-    // so the row above is already the cheap path; this one is the comparison
-    // that justifies it — two thirds of the nodes were a collapsed panel whose
-    // content is built even though it skips layout. Measured rather than
+    // What `technicalPanel: "lazy"` buys. The row above is the default, which
+    // writes the panel out in full; this is the opt-in alternative, and the
+    // reason the option exists — two thirds of the nodes are a collapsed panel
+    // whose content is built even though it skips layout. Measured rather than
     // extrapolated from the node count, because DOM cost is not proportional
-    // to it: the nodes fell 58 % and the time rather less.
-    const eagerHtml = await renderPackageToHtml(pkg, { technicalPanel: "eager" });
+    // to it: the nodes fall 58 % and the time rather less.
+    const lazyHtml = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
     // Kept out of `phases`: it replaces the row above rather than adding to it,
     // and counting it in the pipeline would inflate every share.
     const variant = [
-      `insertion DOM — technicalPanel "eager" (${size(eagerHtml.length)})`,
-      await insert(eagerHtml),
+      `insertion DOM — technicalPanel "lazy" (${size(lazyHtml.length)})`,
+      await insert(lazyHtml),
     ];
 
     const endToEnd = await repeat(
@@ -227,11 +227,11 @@
   legend.className = "note";
   legend.innerHTML = `
     Les parts se rapportent au <em>total à l'écran</em> — pipeline plus insertion dans le DOM,
-    c'est-à-dire l'attente réellement subie. La ligne <em>eager</em>, sous le total, est une
-    <strong>variante de l'insertion DOM</strong> et non une étape de plus : c'est ce que coûtait
-    l'ancien défaut, qui écrivait le panneau technique en entier. « — » : décomposition jugée non
-    fiable pour ce cas — total trop court, ou phases dont la somme dépasse le total, ce qui ne peut
-    venir que du bruit d'horloge.`;
+    c'est-à-dire l'attente réellement subie. La ligne <em>lazy</em>, sous le total, est une
+    <strong>variante de l'insertion DOM</strong> et non une étape de plus : c'est ce que coûterait
+    l'affichage en différant le panneau technique, au lieu de l'écrire en entier comme le fait le
+    défaut. « — » : décomposition jugée non fiable pour ce cas — total trop court, ou phases dont
+    la somme dépasse le total, ce qui ne peut venir que du bruit d'horloge.`;
   out.append(legend);
 
   status.innerHTML = longTaskSupported

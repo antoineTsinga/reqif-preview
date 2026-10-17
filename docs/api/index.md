@@ -94,38 +94,31 @@ surface.
 
 ## Technical panel
 
-Each requirement carries a collapsed "Technical details" panel listing every attribute.
-Measurement showed it to be **two thirds of all the nodes** the renderer emits, and
-inserting nodes into the DOM to be the single largest cost of displaying a document — half
-the wait on a 5 MB export, 70 % on a 50 MB one. The whole panel was therefore the majority
-of the price, paid upfront, for something nobody had asked to see yet.
+Each requirement carries a collapsed "Technical details" panel listing every attribute,
+and `technicalPanel` decides how it is emitted.
 
-So by default its markup travels inside an inert block and becomes real nodes only when the
-panel is opened:
+| Value | What it emits | Nodes per requirement |
+|---|---|---|
+| `"eager"` (default) | the panel, in full | 69 |
+| `"lazy"` | its markup in an inert block, built when opened | 29 |
+| `"off"` | nothing | 26 |
 
-```ts
-// The default. Equivalent to passing nothing.
-const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
-```
-
-On the same 5 MB export that takes the nodes a browser must build from 69 per requirement
-down to 29. The markup still ships, so the output is about 3 % **larger** in bytes — the
-saving is in parsing and layout, not in transfer.
-
-`"eager"` restores the behaviour of every version before this option, with no JavaScript
-involved at all. `"off"` leaves the panel out entirely, which is lighter still if you do
-not need it.
+The default writes it out, which needs no JavaScript and nothing from you. Reach for
+`"lazy"` when a file is big enough that the difference matters — see
+[Heavy files](/guide/large-documents#heavy-files) for the measurements and for when it is
+worth it. `"off"` is lighter still if you simply do not want the panel.
 
 ### Making lazy panels open
 
-Lazy mode needs its script to run, and **a `<script>` inserted through `innerHTML` never
-executes** — that is the HTML specification, not a quirk of any browser. Since `innerHTML`
-is how most pages use this library, the script has to be installed separately:
+`"lazy"` is opt-in rather than the default because it does not work on its own, and that is
+worth being blunt about: **a `<script>` inserted through `innerHTML` never executes**. That
+is the HTML specification, not a quirk of any browser, and `innerHTML` is how most pages
+use this library. So the expander has to be installed separately:
 
 ```ts
 import { renderPackageToHtml, expandLazyPanels } from "reqif-preview";
 
-const html = await renderPackageToHtml(pkg);
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
 document.getElementById("preview")!.innerHTML = html;
 
 // Once, any time. It only installs a listener, so the order relative to
@@ -140,16 +133,14 @@ one:
 
 ```ts
 // Emits the expander inline. Nothing to call: it runs when the document loads.
-const html = await renderPackageToHtml(pkg, { includeJs: true });
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy", includeJs: true });
 ```
-
-It is off by default precisely because of the rule above: in the browser the inlined copy
-could never run, so it would be unreachable bytes in every output, plus a
-Content-Security-Policy violation in exchange for nothing.
 
 Until one of the two is in place, opening a panel shows the
 `labels.technicalUnavailable` message rather than nothing at all — an empty panel reads as
-a broken viewer, which is the wrong thing to tell the reader.
+a broken viewer, which is the wrong thing to tell the reader. That fallback is also the
+reason `"lazy"` is not the default: someone who has configured nothing should get a working
+panel, not a message explaining what they did not do.
 
 Under a strict Content-Security-Policy, which blocks inline scripts even in a
 server-rendered document, leave `includeJs` alone and serve the same text the renderer

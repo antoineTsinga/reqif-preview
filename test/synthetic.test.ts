@@ -93,12 +93,12 @@ describe("synthetic fixture: simple mode vs technical details", () => {
     expect(html).toContain("Ratio");
   });
 
-  it("defers the same panel by default, keeping its content reachable", async () => {
+  it("defers the same panel on request, keeping its content reachable", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml(pkg, { includeCss: false });
-    // The default is now "lazy": the toggle is there, the attribute values
-    // still travel with it, but they sit in an inert block so the browser does
-    // not build two thirds of the document's nodes for a panel nobody opened.
+    const html = await renderPackageToHtml(pkg, { includeCss: false, technicalPanel: "lazy" });
+    // Opting in: the toggle is there and the attribute values still travel with
+    // it, but they sit in an inert block so the browser does not build two
+    // thirds of the document's nodes for a panel nobody opened.
     expect(html).toContain("Technical details");
     expect(html).toContain('type="application/reqif-panel"');
     expect(html).toContain("Count");
@@ -998,9 +998,16 @@ describe("synthetic fixture: rendering & sanitization", () => {
     expect(html).not.toContain("display:none"); // stripped
   });
 
-  it("emits only its own scripts in the default lazy mode", async () => {
+  it("emits no script at all by default", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml(pkg, { includeCss: false });
+    // The fixture carries a <script>alert(1)</script> payload, and the default
+    // render adds none of its own -- so the absolute claim holds here.
+    expect(await renderPackageToHtml(pkg, { includeCss: false })).not.toMatch(/<script/i);
+  });
+
+  it("emits only its own scripts once lazy panels are asked for", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const html = await renderPackageToHtml(pkg, { includeCss: false, technicalPanel: "lazy" });
 
     // The fixture carries a <script>alert(1)</script> payload. Now that the
     // renderer emits scripts of its own, "contains no <script>" can no longer

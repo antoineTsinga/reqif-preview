@@ -133,15 +133,18 @@ const changedCount = computed(() => Object.keys(renderOptions.value).length);
 /**
  * The snippet that reproduces exactly what the preview pane is showing.
  *
- * "Exactly" includes expandLazyPanels(): the preview's technical panels open
- * only because this component calls it, and a snippet that left it out would
- * hand the reader a copy of the page whose panels stay shut. The default
- * technicalPanel: "lazy" defers their markup, and innerHTML never runs the
- * inline expander, so the call is part of the recipe rather than a detail.
+ * expandLazyPanels() appears only when the options actually need it. With the
+ * default technicalPanel: "eager" the panel is written out and nothing has to
+ * be called; under "lazy" it does, because innerHTML never runs the inline
+ * expander. Showing the call unconditionally would teach a step that is not
+ * required, and hiding it under "lazy" would hand the reader a copy of this
+ * page whose panels stay shut.
  */
 const snippet = computed(() => {
   const entries = Object.entries(renderOptions.value);
-  const head = `import { loadReqIfPackage, renderPackageToHtml, expandLazyPanels } from "reqif-preview";
+  const needsExpander = (renderOptions.value as Record<string, unknown>).technicalPanel === "lazy";
+  const imports = ["loadReqIfPackage", "renderPackageToHtml", ...(needsExpander ? ["expandLazyPanels"] : [])];
+  const head = `import { ${imports.join(", ")} } from "reqif-preview";
 
 const pkg = await loadReqIfPackage(bytes);
 `;
@@ -151,10 +154,8 @@ const pkg = await loadReqIfPackage(bytes);
       : `const html = await renderPackageToHtml(pkg, {\n` +
         entries.map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n") +
         `\n});`;
-  return `${head}${call}
-
-preview.innerHTML = html;
-expandLazyPanels();`;
+  const tail = needsExpander ? `\n\npreview.innerHTML = html;\nexpandLazyPanels();` : "";
+  return `${head}${call}${tail}`;
 });
 
 /** Grouped, because dropped-tag alone can fire thousands of times. */

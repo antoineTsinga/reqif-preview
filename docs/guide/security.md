@@ -76,16 +76,18 @@ The HTML produced is meant for `innerHTML`. **No `<script>` ever comes from the 
 — the sanitizer removes those with their subtree — and **nothing in the output executes by
 default**.
 
-What the output does carry, since the lazy technical panel became the default, is one
-inert `<script type="application/reqif-panel">` block per requirement. Despite the tag,
-that is not code: a script block of an unrecognised type is a text container the browser
-neither parses as HTML nor runs. It holds markup the library generated itself, and the
-sequence that could end the block early is escaped on the way in.
+In fact the default output carries **no `<script>` at all**, of any origin. Two options can
+add one, and neither puts anything from the file inside it:
 
-An executable script appears only if you ask for one with `includeJs: true`, and it too
-contains nothing from the file. For output with no `<script>` of any kind,
-`technicalPanel: "eager"` or `"off"` gives exactly that — see
-[Technical panel](/api/#technical-panel).
+- `technicalPanel: "lazy"` adds one inert `<script type="application/reqif-panel">` block
+  per requirement. Despite the tag, that is not code: a script block of an unrecognised
+  type is a text container the browser neither parses as HTML nor runs. It holds markup the
+  library generated itself, and the sequence that could end the block early is escaped on
+  the way in.
+- `includeJs: true` adds the expander, which is a fixed string this library ships —
+  readable as `DEFAULT_JS`, identical for every document.
+
+See [Technical panel](/api/#technical-panel).
 
 It is still not designed to be served as-is as a complete HTML document to a third party
 without appropriate security headers.
