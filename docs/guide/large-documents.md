@@ -67,8 +67,8 @@ Everything above is about documents that fail to parse. This section is about do
 that parse fine but feel slow — and about which knob actually helps, because the obvious
 guesses are wrong.
 
-Measured with `npm run bench`, on a real 4.94 MB IBM DOORS export (1 024 requirements) and
-a generated 49.8 MB file:
+Measured on a real 4.94 MB IBM DOORS export (1 024 requirements) and on a generated
+49.8 MB file, in Node and in Chrome:
 
 | Phase | 4.94 MB | 49.8 MB |
 |---|---|---|
@@ -117,8 +117,24 @@ for 49.8 MB. That is what will end a browser tab before the seconds do, and no o
 here changes it — the model is built whole, in memory, in one pass.
 
 ::: tip Measure your own file
-`npm run bench` takes the fixtures in the repository, but the numbers that matter are the
-ones from a document shaped like yours. Export sizes say less than the depth of the rich
-text inside them: the DOORS file above costs 56 times its size in memory while the
-generated one costs 25, for the same reason its nodes per requirement are higher.
+The numbers above are two documents; the ones that matter are yours. A file's size says
+less than the depth of the rich text inside it — the DOORS export above costs 56 times its
+size in memory where the generated one costs 25, for the same reason its nodes per
+requirement are higher.
+
+```ts
+const started = performance.now();
+const loaded = await loadReqIfPackage(bytes);
+const parsed = performance.now();
+const html = await renderPackageToHtml(loaded);
+const rendered = performance.now();
+document.getElementById("preview")!.innerHTML = html;
+const shown = performance.now();
+
+console.log({
+  parse: parsed - started,
+  render: rendered - parsed,
+  dom: shown - rendered,          // usually the largest of the three
+});
+```
 :::

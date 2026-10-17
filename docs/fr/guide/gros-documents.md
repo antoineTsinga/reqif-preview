@@ -70,8 +70,8 @@ Tout ce qui précède concerne les documents qui échouent au parsing. Cette sec
 ceux qui se parsent très bien mais paraissent lents — et surtout quel réglage aide
 réellement, parce que les suppositions évidentes sont fausses.
 
-Mesuré avec `npm run bench`, sur un vrai export IBM DOORS de 4,94 Mo (1 024 exigences) et
-un fichier généré de 49,8 Mo :
+Mesuré sur un vrai export IBM DOORS de 4,94 Mo (1 024 exigences) et sur un fichier généré
+de 49,8 Mo, sous Node et sous Chrome :
 
 | Phase | 4,94 Mo | 49,8 Mo |
 |---|---|---|
@@ -121,9 +121,24 @@ ici n'y change quoi que ce soit — le modèle est construit entièrement en mé
 seul passage.
 
 ::: tip Mesurez votre propre fichier
-`npm run bench` utilise les fixtures du dépôt, mais les chiffres qui comptent sont ceux
-d'un document de la forme du vôtre. La taille d'un export en dit moins que la profondeur
-du texte riche qu'il contient : le fichier DOORS ci-dessus coûte 56 fois sa taille en
-mémoire quand le fichier généré en coûte 25, pour la même raison que ses nœuds par
-exigence sont plus nombreux.
+Les chiffres ci-dessus portent sur deux documents ; ceux qui comptent sont les vôtres. La
+taille d'un fichier en dit moins que la profondeur du texte riche qu'il contient —
+l'export DOORS ci-dessus coûte 56 fois sa taille en mémoire quand le fichier généré en
+coûte 25, pour la même raison que ses nœuds par exigence sont plus nombreux.
+
+```ts
+const started = performance.now();
+const loaded = await loadReqIfPackage(bytes);
+const parsed = performance.now();
+const html = await renderPackageToHtml(loaded);
+const rendered = performance.now();
+document.getElementById("preview")!.innerHTML = html;
+const shown = performance.now();
+
+console.log({
+  parse: parsed - started,
+  render: rendered - parsed,
+  dom: shown - rendered,          // le plus gros des trois, en général
+});
+```
 :::
