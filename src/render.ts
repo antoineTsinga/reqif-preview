@@ -114,11 +114,18 @@ export interface RenderOptions {
   /** Inline a small default stylesheet. Default: true. */
   includeCss?: boolean;
   /**
-   * Inline the small script that expands lazily-rendered technical panels.
-   * Default: true, and ignored unless `technicalPanel` is `"lazy"`.
+   * Inline the small script that expands lazy technical panels, instead of
+   * leaving that to `expandLazyPanels()`. Default: false, and ignored unless
+   * `technicalPanel` is `"lazy"`.
    *
-   * Set it to false under a strict Content-Security-Policy, which blocks inline
-   * scripts, and call `expandLazyPanels()` yourself instead.
+   * Off by default because **a `<script>` inserted through `innerHTML` never
+   * executes**, so in the browser — the common case, and what the quick start
+   * shows — an inlined copy would be bytes that can never run, plus a
+   * Content-Security-Policy violation for nothing.
+   *
+   * Turn it on when the markup reaches the page some other way: a
+   * server-rendered document, or `document.write`. There the script arrives in
+   * the initial HTML and runs by itself, so nothing else is needed.
    */
   includeJs?: boolean;
   /**
@@ -278,15 +285,18 @@ export interface RenderOptions {
 const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
 
 /**
- * The inline script, emitted only when something will actually need it.
+ * The inline script: opt-in, and only where it could do anything.
  *
- * Shipping it unconditionally would put a `<script>` into the output of callers
- * who chose `"eager"` or `"off"` and have no lazy panel to expand — dead weight,
- * and a Content-Security-Policy violation for nothing.
+ * Two reasons it is not emitted by default. It cannot run at all when the HTML
+ * arrives through `innerHTML`, which is the common case — the browser refuses
+ * to execute a script inserted that way. And under `"eager"` or `"off"` there
+ * is no deferred panel to expand, so even a script that *could* run would have
+ * nothing to do. Either way it would be unreachable bytes and a
+ * Content-Security-Policy violation for nothing.
  */
 function scriptTag(options: RenderOptions): string {
   const lazy = (options.technicalPanel ?? "lazy") === "lazy" && !options.showTechnicalByDefault;
-  if (!lazy || options.includeJs === false) return "";
+  if (!lazy || options.includeJs !== true) return "";
   return `<script>${DEFAULT_JS}</script>`;
 }
 

@@ -1006,10 +1006,12 @@ describe("synthetic fixture: rendering & sanitization", () => {
     // renderer emits scripts of its own, "contains no <script>" can no longer
     // express the invariant that matters, so state it precisely: every script
     // in the output is one of ours, and the payload is still gone.
-    const scripts = html.match(/<script\b[^>]*>/gi) ?? [];
+    const scripts = html.match(/<script(?:\s[^>]*)?>/gi) ?? [];
     expect(scripts.length).toBeGreaterThan(0);
+    // Every one of them is an inert data block: includeJs is off by default, so
+    // the output carries no executable <script> at all.
     for (const tag of scripts) {
-      expect(tag === "<script>" || tag === '<script type="application/reqif-panel">').toBe(true);
+      expect(tag).toBe('<script type="application/reqif-panel">');
     }
     expect(html).not.toContain("alert(");
     expect(html).not.toContain("javascript:");

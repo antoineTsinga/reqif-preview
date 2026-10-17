@@ -133,20 +133,29 @@ document.getElementById("preview")!.innerHTML = html;
 expandLazyPanels();
 ```
 
-Server-rendered pages need nothing: the inline script arrives in the initial document and
-runs by itself.
+If the markup instead reaches the page inside the initial HTML document — server-rendered,
+or written with `document.write` — a script *can* run from there, and `includeJs` asks for
+one:
 
-Until one of the two has happened, opening a panel shows the
+```ts
+// Emits the expander inline. Nothing to call: it runs when the document loads.
+const html = await renderPackageToHtml(pkg, { includeJs: true });
+```
+
+It is off by default precisely because of the rule above: in the browser the inlined copy
+could never run, so it would be unreachable bytes in every output, plus a
+Content-Security-Policy violation in exchange for nothing.
+
+Until one of the two is in place, opening a panel shows the
 `labels.technicalUnavailable` message rather than nothing at all — an empty panel reads as
 a broken viewer, which is the wrong thing to tell the reader.
 
-Under a strict Content-Security-Policy, which blocks inline scripts, turn the inline copy
-off and reach for the same text the renderer would have embedded:
+Under a strict Content-Security-Policy, which blocks inline scripts even in a
+server-rendered document, leave `includeJs` alone and serve the same text the renderer
+would have embedded, under a nonce or a hash:
 
 ```ts
 import { DEFAULT_JS } from "reqif-preview";
-
-const html = await renderPackageToHtml(pkg, { includeJs: false });
 ```
 
 `DEFAULT_JS` and `expandLazyPanels` do the same thing by the same rules — the first

@@ -72,20 +72,33 @@ describe("technicalPanel: deferring the panel nobody has opened", () => {
 });
 
 describe("the inline script", () => {
-  it("is emitted only when a lazy panel needs it", async () => {
+  it("stays out of the output unless asked for", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
     const inline = /<script>\(function\(\)/;
 
-    expect(await renderPackageToHtml(pkg)).toMatch(inline);
-    expect(await renderPackageToHtml(pkg, { technicalPanel: "eager" })).not.toMatch(inline);
-    expect(await renderPackageToHtml(pkg, { technicalPanel: "off" })).not.toMatch(inline);
-    // Strict CSP blocks inline scripts; expandLazyPanels() replaces it.
-    expect(await renderPackageToHtml(pkg, { includeJs: false })).not.toMatch(inline);
+    // Off by default: innerHTML never executes an inserted <script>, so in the
+    // common case an inlined copy is bytes that can never run.
+    expect(await renderPackageToHtml(pkg)).not.toMatch(inline);
+    expect(await renderPackageToHtml(pkg, { includeJs: true })).toMatch(inline);
+  });
+
+  it("is refused where it would have nothing to do", async () => {
+    const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
+    const inline = /<script>\(function\(\)/;
+
+    // Asked for, but there is no deferred panel to expand -- so emitting it
+    // would be a CSP violation in exchange for nothing.
+    expect(await renderPackageToHtml(pkg, { includeJs: true, technicalPanel: "eager" })).not.toMatch(inline);
+    expect(await renderPackageToHtml(pkg, { includeJs: true, technicalPanel: "off" })).not.toMatch(inline);
+    expect(await renderPackageToHtml(pkg, { includeJs: true, showTechnicalByDefault: true })).not.toMatch(inline);
   });
 
   it("ships once per package, not once per document", async () => {
     const pkg = await loadReqIfPackage(SYNTHETIC_REQIF);
-    const html = await renderPackageToHtml({ ...pkg, documents: [pkg.document, pkg.document] });
+    const html = await renderPackageToHtml(
+      { ...pkg, documents: [pkg.document, pkg.document] },
+      { includeJs: true },
+    );
 
     expect(html.match(/<script>\(function\(\)/g)).toHaveLength(1);
   });

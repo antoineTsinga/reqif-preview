@@ -383,6 +383,8 @@ for (const value of obj.values) {
 
 Ce panneau est **volontairement jamais filtré** par la détection de cycle de vie : c'est la zone "transparence totale", qui liste tout, même ce qui est déjà résumé ailleurs (voir section 9).
 
+C'est cette exhaustivité qui en fait le poste le plus lourd de la sortie — deux tiers des nœuds émis — et donc la raison pour laquelle `renderTechnicalPanel` ne l'écrit plus en clair par défaut. Les lignes ci-dessus sont construites de façon identique dans les trois modes de `technicalPanel` ; seule leur destination change : écrites dans le DOM (`"eager"`), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`, le défaut), ou abandonnées (`"off"`). La mesure qui a motivé ce choix est en §11.
+
 ### Onglets sans JavaScript, numérotation, mode lecture
 
 Trois mécanismes additionnels suivent les mêmes principes que le reste du rendu :
@@ -522,7 +524,21 @@ La linéarité annoncée tient : 10× l'entrée donne 12,8× le temps de parsing
 Deux corrections s'imposent en revanche à l'intuition que le reste du document pourrait laisser :
 
 - **le coût dominant n'est pas le parsing mais l'insertion du HTML produit dans le DOM** : la moitié du temps subi sur un fichier réaliste, 70 % sur un gros. Cette étape est hors de la bibliothèque — elle appartient à l'appelant qui fait `innerHTML` — ce qui explique qu'elle ait longtemps échappé à l'analyse ;
-- **les deux tiers des nœuds émis sont le panneau technique** (§8), à l'intérieur d'un `<details>` replié. Un `<details>` fermé saute la mise en page mais ses nœuds sont construits quand même, donc payés plein tarif. Sur l'export DOORS, les 70 230 balises se répartissent en 62 % de panneau technique, 7 % de ligne de cycle de vie, 2,9 % de badge d'identifiant, et le reste en titres et contenu.
+- **les deux tiers des nœuds émis étaient le panneau technique** (§8), à l'intérieur d'un `<details>` replié. Un `<details>` fermé saute la mise en page mais ses nœuds sont construits quand même, donc payés plein tarif. Sur l'export DOORS, les 70 230 balises se répartissaient en 62 % de panneau technique, 7 % de ligne de cycle de vie, 2,9 % de badge d'identifiant, et le reste en titres et contenu.
+
+### Ce que la mesure a changé dans le code
+
+C'est la seconde observation qui a été corrigée, et elle explique la forme actuelle de §8. L'option `technicalPanel` vaut désormais `"lazy"` par défaut : le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
+
+| Mode | Nœuds DOM (DOORS) | Par exigence | Octets |
+|---|---|---|---|
+| `"eager"` (ancien comportement) | 70 230 | 69 | 3,76 Mo |
+| `"lazy"` (défaut actuel) | **29 787** | **29** | 3,87 Mo |
+| `"off"` | 26 714 | 26 | 1,58 Mo |
+
+Le balisage est toujours transmis : la sortie est donc ~3 % **plus grosse** en octets. Le gain est à l'analyse et à la mise en page, pas au transfert — c'est-à-dire précisément là où la mesure a trouvé le coût.
+
+Le déploiement demande du JavaScript, ce qui est une première pour cette bibliothèque : les onglets, eux, reposent sur `:target` et n'en demandent aucun (§8). Deux chemins le fournissent, parce qu'un seul ne suffit pas — un `<script>` inséré via `innerHTML` ne s'exécute jamais, ce qui est la spécification HTML. L'export `expandLazyPanels()` couvre donc le navigateur, et l'option `includeJs: true` émet une copie inline pour un document rendu côté serveur. Un panneau dont ni l'un ni l'autre n'a été mis en place s'ouvre sur le message `labels.technicalUnavailable`, jamais sur du vide.
 
 ---
 

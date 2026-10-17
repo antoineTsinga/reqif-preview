@@ -136,20 +136,29 @@ document.getElementById("preview")!.innerHTML = html;
 expandLazyPanels();
 ```
 
-Les pages rendues côté serveur n'ont rien à faire : le script inline arrive dans le
-document initial et s'exécute tout seul.
+Si le balisage arrive au contraire dans le document HTML initial — rendu côté serveur, ou
+écrit par `document.write` — un script *peut* s'exécuter de là, et `includeJs` en demande
+un :
 
-Tant que ni l'un ni l'autre n'a eu lieu, l'ouverture d'un panneau affiche le message
+```ts
+// Émet le déployeur inline. Rien à appeler : il s'exécute au chargement.
+const html = await renderPackageToHtml(pkg, { includeJs: true });
+```
+
+Il est désactivé par défaut précisément à cause de la règle ci-dessus : dans le navigateur
+la copie inline ne pourrait jamais s'exécuter, ce seraient donc des octets inatteignables
+dans chaque sortie, et une violation de Content-Security-Policy en échange de rien.
+
+Tant que ni l'un ni l'autre n'est en place, l'ouverture d'un panneau affiche le message
 `labels.technicalUnavailable` plutôt que rien du tout — un panneau vide se lit comme un
 viewer cassé, ce qui est la mauvaise chose à dire au lecteur.
 
-Sous une Content-Security-Policy stricte, qui bloque les scripts inline, désactivez la
-copie inline et récupérez le même texte que le rendu aurait embarqué :
+Sous une Content-Security-Policy stricte, qui bloque les scripts inline même dans un
+document rendu côté serveur, laissez `includeJs` tranquille et servez vous-même le texte
+que le rendu aurait embarqué, sous un nonce ou un hash :
 
 ```ts
 import { DEFAULT_JS } from "reqif-preview";
-
-const html = await renderPackageToHtml(pkg, { includeJs: false });
 ```
 
 `DEFAULT_JS` et `expandLazyPanels` font la même chose selon les mêmes règles — le
