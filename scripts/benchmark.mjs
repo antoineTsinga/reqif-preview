@@ -139,6 +139,12 @@ async function repeat(fn, { warmup, runs }) {
   return { min: times[0], median: times[times.length >> 1] };
 }
 
+/** Counts the elements a browser would build, ignoring inert script payloads. */
+function countDomNodes(html) {
+  const inert = html.replace(/<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi, "<script></script>");
+  return (inert.match(/<[a-z]/gi) ?? []).length;
+}
+
 async function runCase(file) {
   const { parseReqIfXml, ReqIfIndex, loadReqIfPackage, renderPackageToHtml,
           createAttachmentLookup, renderSpecification } = await import("../dist/index.js");
@@ -193,6 +199,11 @@ async function runCase(file) {
     // export, 94 ms x 3 specs closes the gap almost exactly.
     specs: pkg.documents.reduce((n, d) => n + d.coreContent.specifications.length, 0),
     htmlBytes: Buffer.byteLength(html),
+    // The nodes a browser would actually build. A script block's contents are
+    // not parsed as HTML, so neutralising those is what separates the markup
+    // that becomes DOM from the markup that merely travels -- which is the
+    // whole mechanism behind the default lazy technical panel.
+    domNodes: countDomNodes(html),
     // maxRSS is a high-water mark for the whole process: exact here, because
     // this process measured exactly one fixture.
     maxRssMb: process.resourceUsage().maxRSS / 1024,
@@ -262,7 +273,8 @@ for (const r of results) {
   console.log(
     `  ${mb(r.bytes)} · ${r.objects.toLocaleString("fr-FR")} SpecObject · ` +
       `${r.specs} spécification${r.specs > 1 ? "s" : ""} · ` +
-      `${mb(r.htmlBytes)} de HTML · pic mémoire ${r.maxRssMb.toFixed(0)} Mo` +
+      `${mb(r.htmlBytes)} de HTML · ${r.domNodes.toLocaleString("fr-FR")} nœuds DOM · ` +
+      `pic mémoire ${r.maxRssMb.toFixed(0)} Mo` +
       `  \x1b[2m(min sur ${r.budget.runs}, ${r.budget.warmup} de chauffe)\x1b[0m`,
   );
   const total = r.phases.endToEnd.min;
