@@ -505,6 +505,25 @@ Avec *n* = nombre total de nœuds XML du document, *m* = nombre de pièces joint
 
 Aucune étape n'est quadratique : il n'y a jamais de recherche linéaire imbriquée dans une autre boucle sur l'ensemble du document — c'est précisément ce que `ReqIfIndex` est censé empêcher.
 
+### Ce que la mesure confirme, et ce qu'elle corrige
+
+Le tableau ci-dessus est asymptotique ; `npm run bench` donne les constantes. Sur un export DOORS réel de 4,94 Mo (1 024 exigences) et un synthétique de 49,8 Mo :
+
+| Phase | 4,94 Mo | 49,8 Mo |
+|---|---|---|
+| Parsing XML → modèle | 278 ms | 3 554 ms |
+| Construction de `ReqIfIndex` | 0,5 ms | 9,3 ms |
+| Résolution des pièces jointes | 0,5 ms | 12,7 ms |
+| Rendu en chaîne (1 spécification) | 99 ms | 3 217 ms |
+| **Insertion dans le DOM + mise en page** | **550 ms** | **22 211 ms** |
+
+La linéarité annoncée tient : 10× l'entrée donne 12,8× le temps de parsing, et l'index — l'étape que ce document présente comme la raison d'être de toute l'indexation — coûte réellement 0 % du total.
+
+Deux corrections s'imposent en revanche à l'intuition que le reste du document pourrait laisser :
+
+- **le coût dominant n'est pas le parsing mais l'insertion du HTML produit dans le DOM** : la moitié du temps subi sur un fichier réaliste, 70 % sur un gros. Cette étape est hors de la bibliothèque — elle appartient à l'appelant qui fait `innerHTML` — ce qui explique qu'elle ait longtemps échappé à l'analyse ;
+- **les deux tiers des nœuds émis sont le panneau technique** (§8), à l'intérieur d'un `<details>` replié. Un `<details>` fermé saute la mise en page mais ses nœuds sont construits quand même, donc payés plein tarif. Sur l'export DOORS, les 70 230 balises se répartissent en 62 % de panneau technique, 7 % de ligne de cycle de vie, 2,9 % de badge d'identifiant, et le reste en titres et contenu.
+
 ---
 
 ## 12. Philosophie générale : fail-safe partout
@@ -528,3 +547,5 @@ Quelques incarnations concrètes de ce principe, déjà rencontrées dans les se
 - `isBalancedHtml` reste une heuristique de bon sens, pas un parseur HTML conforme : un cas pathologique extrêmement spécifique (par ex. exploitant les règles de fermeture implicite du HTML5 sur `<li>`/`<p>`/cellules de tableau) pourrait en théorie passer entre les mailles. Le compromis accepté est : zéro dépendance supplémentaire, contre une couverture "assez bonne pour les erreurs humaines courantes".
 - La détection des métadonnées de cycle de vie (`lifecycle.ts`) repose sur une convention de nommage non normalisée par l'OMG — un outil qui n'utilise aucune des variantes reconnues (`ReqIF.ForeignID`, `Foreign ID`, etc.) ne sera simplement pas détecté automatiquement ; c'est pour ce cas que `titleAttributes`/`contentAttributes`/`customAttributeRenderers` existent comme échappatoires explicites.
 - `maxNestedTags` est une limite globale par appel de parsing, pas par section du document : un document légitimement profond sur un seul attribut XHTML partage le même budget que la profondeur de la hiérarchie des spécifications.
+- **Le pic mémoire vaut 25 à 56 fois la taille du fichier d'entrée** (1,28 Go pour 49,8 Mo, 329 Mo pour 4,94 Mo). Le modèle est construit entièrement en mémoire, en un seul passage, et le HTML produit — 64 Mo de chaîne pour 49,8 Mo d'entrée — coexiste avec lui le temps du rendu. C'est cette contrainte, et non le temps de calcul, qui plafonne la taille de fichier exploitable dans un onglet. Un parsing en flux (SAX) la lèverait ; rien d'autre ne la lèvera.
+- **Le rendu est monolithique** : `renderPackageToHtml` retourne une seule chaîne, que l'appelant ne peut insérer qu'en un bloc. L'insertion devient alors la phase la plus coûteuse de la chaîne (§11) et bloque le fil principal sans découpage possible — un Web Worker n'y change rien, le DOM n'étant accessible que depuis le fil principal. `renderSpecification` est exporté précisément pour laisser une interface construire son propre affichage progressif ; il n'existe pas encore d'API d'arbre plus fine (`getChildren`, `getRequirement`).
