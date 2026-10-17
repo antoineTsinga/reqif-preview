@@ -27,7 +27,9 @@ const MESSAGES = {
     stacked: "Documents and specifications stacked one under the other",
     tabs: "CSS tabs driven by the URL fragment",
     readingMode: "Reading view", chapterNumbers: "Number 1, 1.1, 1.2…",
-    technical: "Technical panel open", simplified: "Simplified version rather than the original",
+    technical: "Technical panel open",
+    lazyPanel: "Build the technical panel only when opened — halves the DOM work",
+    simplified: "Simplified version rather than the original",
     relations: "Links between requirements",
     preview: "Preview", code: "Code", diagnostics: "Diagnostics",
     rendering: "rendering…", renderedAt: "rendered at",
@@ -45,7 +47,9 @@ const MESSAGES = {
     stacked: "Documents et spécifications les uns sous les autres",
     tabs: "Onglets CSS pilotés par le fragment d'URL",
     readingMode: "Vue de lecture", chapterNumbers: "Numéroter 1, 1.1, 1.2…",
-    technical: "Panneau technique ouvert", simplified: "Version simplifiée plutôt que l'original",
+    technical: "Panneau technique ouvert",
+    lazyPanel: "Ne construire le panneau technique qu'à l'ouverture — divise par deux le travail DOM",
+    simplified: "Version simplifiée plutôt que l'original",
     relations: "Liens entre exigences",
     preview: "Aperçu", code: "Code", diagnostics: "Diagnostics",
     rendering: "rendu en cours…", renderedAt: "rendu à",
@@ -85,6 +89,11 @@ const readingMode = ref(false);
 const chapterNumbers = ref(false);
 const chapterNumberAttributes = ref("");
 const showTechnicalByDefault = ref(false);
+// On by default, unlike the library. The library defaults to "eager" so that the
+// plainest possible code works unread; this page has no such excuse -- it takes
+// whatever file a stranger drops on it, and eager rendering of a 50 MB export is
+// 22 s of frozen tab for a panel nobody opened. Visually identical either way.
+const lazyTechnicalPanel = ref(true);
 const preferSimplifiedXhtml = ref(false);
 const showRelations = ref(true);
 const dateLocale = ref("fr-FR");
@@ -96,6 +105,7 @@ const toggles = computed(() => [
   { model: readingMode, label: "readingMode", hint: t.value.readingMode },
   { model: chapterNumbers, label: "chapterNumbers", hint: t.value.chapterNumbers },
   { model: showTechnicalByDefault, label: "showTechnicalByDefault", hint: t.value.technical },
+  { model: lazyTechnicalPanel, label: 'technicalPanel: "lazy"', hint: t.value.lazyPanel },
   { model: preferSimplifiedXhtml, label: "preferSimplifiedXhtml", hint: t.value.simplified },
   { model: showRelations, label: "showRelations", hint: t.value.relations },
 ]);
@@ -118,6 +128,7 @@ const renderOptions = computed(() => {
   const chapters = list(chapterNumberAttributes.value);
   if (chapters) o.chapterNumberAttributes = chapters;
   if (showTechnicalByDefault.value) o.showTechnicalByDefault = true;
+  if (lazyTechnicalPanel.value) o.technicalPanel = "lazy";
   if (preferSimplifiedXhtml.value) o.preferSimplifiedXhtml = true;
   if (!showRelations.value) o.showRelations = false;
   if (dateLocale.value && dateLocale.value !== "fr-FR") o.dateLocale = dateLocale.value;
