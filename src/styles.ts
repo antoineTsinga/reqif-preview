@@ -48,6 +48,15 @@ export const DEFAULT_CSS: string = `
 .reqif-technical-toggle:hover { background: #e6e6e6; }
 .reqif-technical[open] > .reqif-technical-toggle { background: #e0ebfb; border-color: #b6d0f5; }
 .reqif-technical .reqif-attrs { margin-top: 10px; }
+/* A lazy panel opened before its script ran. The message travels in the
+   attribute rather than in a node of its own, so saying this costs nothing
+   per requirement and stays translatable through the labels option. The rule
+   stops matching once the panel hydrates and the attribute is removed. */
+.reqif-technical[data-reqif-lazy][open]::after {
+  content: attr(data-reqif-lazy);
+  display: block; margin-top: 10px; font-size: 12px; color: #8a6d3b;
+  background: #fcf8e3; border: 1px solid #f3e6c0; border-radius: 6px; padding: 6px 10px;
+}
 .reqif-meta-strip { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; }
 .reqif-meta-chip { display: inline-flex; align-items: center; gap: 4px; background: #f5f5f5; border-radius: 6px; padding: 2px 8px; color: #444; white-space: nowrap; max-width: 100%; }
 .reqif-meta-role { color: #888; }

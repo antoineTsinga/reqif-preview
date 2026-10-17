@@ -18,7 +18,7 @@ npm install reqif-preview
 ## Démarrage rapide
 
 ```ts
-import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
+import { loadReqIfPackage, renderPackageToHtml, activateTechnicalPanels } from "reqif-preview";
 
 // Les octets de votre fichier. Depuis une URL :
 const fileBytes = new Uint8Array(await (await fetch("/exigences.reqifz")).arrayBuffer());
@@ -30,6 +30,11 @@ const pkg = await loadReqIfPackage(fileBytes);
 
 const html = await renderPackageToHtml(pkg);
 document.getElementById("preview").innerHTML = html;
+
+// Permet aux panneaux « Détails techniques » de s'ouvrir. Une fois, après
+// l'insertion : innerHTML n'exécute jamais un <script> inline, la
+// bibliothèque ne peut donc pas le faire elle-même.
+activateTechnicalPanels();
 ```
 
 C'est tout pour le cas simple : `loadReqIfPackage` détecte automatiquement si l'entrée

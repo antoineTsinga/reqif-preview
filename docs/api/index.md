@@ -90,3 +90,62 @@ these**: their mechanism rests entirely on this stylesheet's `:target` rules.
 dark-themed page, the preview would be unreadable: it is up to the host to provide a light
 surface.
 :::
+
+## Technical panel
+
+Each requirement carries a collapsed "Technical details" panel listing every attribute.
+Measurement showed it to be **two thirds of all the nodes** the renderer emits, and
+inserting nodes into the DOM to be the single largest cost of displaying a document — half
+the wait on a 5 MB export, 70 % on a 50 MB one. The whole panel was therefore the majority
+of the price, paid upfront, for something nobody had asked to see yet.
+
+So by default its markup travels inside an inert block and becomes real nodes only when the
+panel is opened:
+
+```ts
+// The default. Equivalent to passing nothing.
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
+```
+
+On the same 5 MB export that takes the nodes a browser must build from 69 per requirement
+down to 29. The markup still ships, so the output is about 3 % **larger** in bytes — the
+saving is in parsing and layout, not in transfer.
+
+`"eager"` restores the behaviour of every version before this option, with no JavaScript
+involved at all. `"off"` leaves the panel out entirely, which is lighter still if you do
+not need it.
+
+### Making lazy panels open
+
+Lazy mode needs its script to run, and **a `<script>` inserted through `innerHTML` never
+executes** — that is the HTML specification, not a quirk of any browser. Since `innerHTML`
+is how most pages use this library, the script has to be installed separately:
+
+```ts
+import { renderPackageToHtml, activateTechnicalPanels } from "reqif-preview";
+
+const html = await renderPackageToHtml(pkg);
+document.getElementById("preview")!.innerHTML = html;
+
+// Once, after inserting. Idempotent, and a no-op outside a browser.
+activateTechnicalPanels();
+```
+
+Server-rendered pages need nothing: the inline script arrives in the initial document and
+runs by itself.
+
+Until one of the two has happened, opening a panel shows the
+`labels.technicalUnavailable` message rather than nothing at all — an empty panel reads as
+a broken viewer, which is the wrong thing to tell the reader.
+
+Under a strict Content-Security-Policy, which blocks inline scripts, turn the inline copy
+off and reach for the same text the renderer would have embedded:
+
+```ts
+import { DEFAULT_JS } from "reqif-preview";
+
+const html = await renderPackageToHtml(pkg, { includeJs: false });
+```
+
+`DEFAULT_JS` and `activateTechnicalPanels` do the same thing by the same rules — the first
+as text you can serve under a nonce or hash, the second as a function you call.

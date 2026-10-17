@@ -72,6 +72,16 @@ existe pour les balises mal fermées, mais il ne protège pas de l'injection : i
 l'équilibre des balises, pas la provenance du texte.
 :::
 
-Le HTML produit est destiné à `innerHTML`. Il ne contient jamais de `<script>` et
-n'exécute rien de lui-même, mais il n'est pas conçu pour être servi tel quel comme
-document HTML complet à un tiers sans en-têtes de sécurité appropriés.
+Le HTML produit est destiné à `innerHTML`. **Aucun `<script>` ne provient jamais du
+document** — l'assainisseur les supprime avec leur sous-arbre — mais depuis que le panneau
+technique paresseux est le défaut, la sortie porte deux scripts propres à la bibliothèque :
+le déployeur inline, et un bloc inerte `application/reqif-panel` par exigence contenant du
+balisage que la bibliothèque a produit elle-même.
+
+Ni l'un ni l'autre n'exécute quoi que ce soit venant du fichier. Si vous préférez une
+sortie sans aucun `<script>`, `technicalPanel: "eager"` ou `"off"` donne exactement cela,
+et `includeJs: false` retire celui qui est inline — voir
+[Panneau technique](/fr/api/#panneau-technique).
+
+Cela reste non conçu pour être servi tel quel comme document HTML complet à un tiers sans
+en-têtes de sécurité appropriés.

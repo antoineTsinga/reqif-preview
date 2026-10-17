@@ -72,6 +72,15 @@ unbalanced tags, but it does not protect against injection: it checks that tags 
 not where the text came from.
 :::
 
-The HTML produced is meant for `innerHTML`. It never contains a `<script>` and executes
-nothing by itself, but it is not designed to be served as-is as a complete HTML document
-to a third party without appropriate security headers.
+The HTML produced is meant for `innerHTML`. **No `<script>` ever comes from the document**
+— the sanitizer removes those with their subtree — but since the lazy technical panel
+became the default, the output does carry two scripts of the library's own: the inline
+expander, and one inert `application/reqif-panel` block per requirement holding markup
+the library produced itself.
+
+Neither runs anything from the file. If you would rather have output with no `<script>` at
+all, `technicalPanel: "eager"` or `"off"` gives exactly that, and `includeJs: false` drops
+the inline one — see [Technical panel](/api/#technical-panel).
+
+It is still not designed to be served as-is as a complete HTML document to a third party
+without appropriate security headers.

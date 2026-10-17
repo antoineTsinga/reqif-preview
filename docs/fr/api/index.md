@@ -91,3 +91,65 @@ cette feuille.
 une page au thème sombre, l'aperçu serait illisible : c'est à l'hôte de fournir une surface
 claire.
 :::
+
+## Panneau technique
+
+Chaque exigence porte un panneau « Détails techniques » replié qui liste tous ses
+attributs. La mesure a montré qu'il représente **les deux tiers des nœuds** émis par le
+rendu, et que l'insertion des nœuds dans le DOM est le poste le plus coûteux de
+l'affichage — la moitié de l'attente sur un export de 5 Mo, 70 % sur un de 50 Mo. Le
+panneau était donc la majorité du prix, payée d'avance, pour quelque chose que personne
+n'avait demandé à voir.
+
+Par défaut son balisage voyage donc dans un bloc inerte et ne devient de vrais nœuds qu'à
+l'ouverture :
+
+```ts
+// Le défaut. Équivaut à ne rien passer.
+const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
+```
+
+Sur ce même export de 5 Mo, les nœuds que le navigateur doit construire passent de 69 par
+exigence à 29. Le balisage est toujours transmis : la sortie est donc environ 3 % **plus
+grosse** en octets — le gain est à l'analyse et à la mise en page, pas au transfert.
+
+`"eager"` rétablit le comportement de toutes les versions antérieures à cette option, sans
+aucun JavaScript. `"off"` omet le panneau entièrement, ce qui est plus léger encore si vous
+n'en avez pas besoin.
+
+### Faire fonctionner les panneaux paresseux
+
+Le mode paresseux a besoin que son script s'exécute, et **un `<script>` inséré via
+`innerHTML` ne s'exécute jamais** — c'est la spécification HTML, pas une bizarrerie de
+navigateur. Comme `innerHTML` est la façon dont la plupart des pages utilisent cette
+bibliothèque, le script doit être installé séparément :
+
+```ts
+import { renderPackageToHtml, activateTechnicalPanels } from "reqif-preview";
+
+const html = await renderPackageToHtml(pkg);
+document.getElementById("preview")!.innerHTML = html;
+
+// Une fois, après l'insertion. Idempotent, et sans effet hors navigateur.
+activateTechnicalPanels();
+```
+
+Les pages rendues côté serveur n'ont rien à faire : le script inline arrive dans le
+document initial et s'exécute tout seul.
+
+Tant que ni l'un ni l'autre n'a eu lieu, l'ouverture d'un panneau affiche le message
+`labels.technicalUnavailable` plutôt que rien du tout — un panneau vide se lit comme un
+viewer cassé, ce qui est la mauvaise chose à dire au lecteur.
+
+Sous une Content-Security-Policy stricte, qui bloque les scripts inline, désactivez la
+copie inline et récupérez le même texte que le rendu aurait embarqué :
+
+```ts
+import { DEFAULT_JS } from "reqif-preview";
+
+const html = await renderPackageToHtml(pkg, { includeJs: false });
+```
+
+`DEFAULT_JS` et `activateTechnicalPanels` font la même chose selon les mêmes règles — le
+premier comme texte que vous pouvez servir sous un nonce ou un hash, le second comme
+fonction à appeler.

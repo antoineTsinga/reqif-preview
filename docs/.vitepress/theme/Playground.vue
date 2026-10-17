@@ -166,6 +166,11 @@ async function render() {
       onDegradation: (e) => collected.push(e as Degradation),
     } as never);
     events.value = collected;
+    // v-html is innerHTML, which never runs an inline <script> — so the
+    // library's own expander has to be installed from here, or the lazy
+    // technical panels would open onto their "needs JavaScript" message.
+    // Idempotent: one document-level listener, however often this runs.
+    lib.value.activateTechnicalPanels?.();
     status.value = `${fileName.value} — ${t.value.renderedAt} ${new Date().toLocaleTimeString(lang.value)}`;
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);

@@ -2,6 +2,7 @@ import { ReqIfIndex } from "./lookup.js";
 import { toBase64 } from "./base64.js";
 import { escapeAttr, escapeHtml } from "./escape.js";
 import { DEFAULT_CSS } from "./styles.js";
+import { DEFAULT_JS, LAZY_ATTR, PANEL_SCRIPT_TYPE, escapePanelPayload } from "./script.js";
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
 import { renderTabs } from "./tabs.js";
@@ -41,6 +42,8 @@ export interface RenderLabels {
   untitled: string;
   idLabel: string;
   technicalDetails: string;
+  /** Shown when a lazy panel is opened before its script has run. */
+  technicalUnavailable: string;
   headerTitle: string;
   headerSourceTool: string;
   headerExportedBy: string;
@@ -62,6 +65,7 @@ const DEFAULT_LABELS: RenderLabels = {
   untitled: "(untitled)",
   idLabel: "ID",
   technicalDetails: "Technical details",
+  technicalUnavailable: "Details unavailable — this panel needs JavaScript.",
   headerTitle: "Title",
   headerSourceTool: "Source tool",
   headerExportedBy: "Exported by",
@@ -89,6 +93,7 @@ export const FRENCH_LABELS: RenderLabels = {
   untitled: "(sans titre)",
   idLabel: "ID",
   technicalDetails: "Détails techniques",
+  technicalUnavailable: "Détails indisponibles — ce panneau nécessite JavaScript.",
   headerTitle: "Titre",
   headerSourceTool: "Outil source",
   headerExportedBy: "Exporté par",
@@ -108,6 +113,33 @@ export const FRENCH_LABELS: RenderLabels = {
 export interface RenderOptions {
   /** Inline a small default stylesheet. Default: true. */
   includeCss?: boolean;
+  /**
+   * Inline the small script that expands lazily-rendered technical panels.
+   * Default: true, and ignored unless `technicalPanel` is `"lazy"`.
+   *
+   * Set it to false under a strict Content-Security-Policy, which blocks inline
+   * scripts, and call `activateTechnicalPanels()` yourself instead.
+   */
+  includeJs?: boolean;
+  /**
+   * How each requirement's technical-details panel is emitted.
+   *
+   * - `"lazy"` (default) ships the panel's markup inside an inert
+   *   `<script type="application/reqif-panel">` block and builds it when the
+   *   panel is first opened. Measurement showed the panel to be two thirds of
+   *   all emitted nodes, and inserting nodes into the DOM to be the single
+   *   largest cost of displaying a document — so the panel was the majority of
+   *   the price, paid upfront, for something nobody had asked to see yet.
+   * - `"eager"` writes the panel out in full, as every version before this
+   *   option did. No JavaScript involved.
+   * - `"off"` omits it entirely.
+   *
+   * `"lazy"` needs the inline script to run, or `activateTechnicalPanels()` to
+   * be called — notably when you assign the HTML with `innerHTML`, which never
+   * executes an inline script. Until then the panel opens onto the
+   * `labels.technicalUnavailable` message rather than onto nothing.
+   */
+  technicalPanel?: "lazy" | "eager" | "off";
   /** Override the package's own attachment resolver. */
   attachments?: AttachmentResolver;
   /** UI strings, for basic i18n. */
@@ -245,6 +277,19 @@ export interface RenderOptions {
 
 const DEFAULT_MAX_INLINE_BYTES = 5 * 1024 * 1024;
 
+/**
+ * The inline script, emitted only when something will actually need it.
+ *
+ * Shipping it unconditionally would put a `<script>` into the output of callers
+ * who chose `"eager"` or `"off"` and have no lazy panel to expand — dead weight,
+ * and a Content-Security-Policy violation for nothing.
+ */
+function scriptTag(options: RenderOptions): string {
+  const lazy = (options.technicalPanel ?? "lazy") === "lazy" && !options.showTechnicalByDefault;
+  if (!lazy || options.includeJs === false) return "";
+  return `<script>${DEFAULT_JS}</script>`;
+}
+
 /** Renders every document found in a package (a .reqifz may contain several). */
 export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOptions = {}): Promise<string> {
   const attachments = options.attachments ?? pkg.attachments;
@@ -256,7 +301,9 @@ export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOpti
   const emittedIds = new Set<string>();
   const parts = await Promise.all(
     pkg.documents.map((doc) =>
-      renderDocumentToHtml(doc, attachments, { ...options, includeCss: false }, index, emittedIds),
+      // includeJs alongside includeCss: the package emits one copy of each, so
+      // a ten-document .reqifz does not carry ten identical scripts.
+      renderDocumentToHtml(doc, attachments, { ...options, includeCss: false, includeJs: false }, index, emittedIds),
     ),
   );
 
@@ -276,7 +323,7 @@ export async function renderPackageToHtml(pkg: ReqIfPackage, options: RenderOpti
 
   const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
   const rootClass = options.readingMode ? "reqif-preview reqif-reading-mode" : "reqif-preview";
-  return `${css}<div class="${rootClass}">${body}</div>`;
+  return `${css}${scriptTag(options)}<div class="${rootClass}">${body}</div>`;
 }
 
 /**
@@ -319,7 +366,7 @@ export async function renderDocumentToHtml(
 
   const css = options.includeCss === false ? "" : `<style>${DEFAULT_CSS}</style>`;
   const rootClass = options.readingMode ? "reqif-preview reqif-reading-mode" : "reqif-preview";
-  return `${css}<div class="${rootClass}">${header}<div class="reqif-specs">${specsHtml}</div></div>`;
+  return `${css}${scriptTag(options)}<div class="${rootClass}">${header}<div class="reqif-specs">${specsHtml}</div></div>`;
 }
 
 /** Renders one Specification subtree (useful for lazy/virtualized UIs). */
@@ -831,11 +878,25 @@ function renderTechnicalPanel(
   }
 
   if (rows.length === 0) return "";
+
+  const mode = options.technicalPanel ?? "lazy";
+  if (mode === "off") return "";
+
   const openAttr = options.showTechnicalByDefault ? " open" : "";
+  const summary = `<summary class="reqif-technical-toggle">${escapeHtml(labels.technicalDetails)}</summary>`;
+  const panel = `<dl class="reqif-attrs">${rows.join("")}</dl>`;
+
+  // Expanded by default means it is on screen immediately, so deferring its
+  // construction would buy nothing and only add a hydration step before the
+  // user sees what they already asked for.
+  if (mode === "eager" || options.showTechnicalByDefault) {
+    return `<details class="reqif-technical"${openAttr}>${summary}${panel}</details>`;
+  }
+
   return (
-    `<details class="reqif-technical"${openAttr}>` +
-    `<summary class="reqif-technical-toggle">${escapeHtml(labels.technicalDetails)}</summary>` +
-    `<dl class="reqif-attrs">${rows.join("")}</dl>` +
+    `<details class="reqif-technical" ${LAZY_ATTR}="${escapeAttr(labels.technicalUnavailable)}">` +
+    summary +
+    `<script type="${PANEL_SCRIPT_TYPE}">${escapePanelPayload(panel)}</script>` +
     `</details>`
   );
 }

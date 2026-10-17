@@ -15,7 +15,7 @@ npm install reqif-preview
 ## Quick start
 
 ```ts
-import { loadReqIfPackage, renderPackageToHtml } from "reqif-preview";
+import { loadReqIfPackage, renderPackageToHtml, activateTechnicalPanels } from "reqif-preview";
 
 // The bytes of your file. From a URL:
 const fileBytes = new Uint8Array(await (await fetch("/requirements.reqifz")).arrayBuffer());
@@ -27,6 +27,10 @@ const pkg = await loadReqIfPackage(fileBytes);
 
 const html = await renderPackageToHtml(pkg);
 document.getElementById("preview").innerHTML = html;
+
+// Lets the "Technical details" panels open. Call it once, after inserting:
+// innerHTML never runs an inline <script>, so the library cannot do it itself.
+activateTechnicalPanels();
 ```
 
 That is all there is to the simple case: `loadReqIfPackage` works out on its own whether the input is raw XML (`.reqif`) or a zip archive (`.reqifz`), extracts the attachments, and `renderPackageToHtml` produces a self-contained block of HTML (with its own `<style>` scoping `.reqif-preview`) — the specification tree, rich text (bold/italic/lists/tables), images inlined as `data:` URIs.
