@@ -97,60 +97,67 @@ function baseName(path: string): string {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
-function renderChildren(nodes: XhtmlNode[], opts: XhtmlRenderOptions): string {
-  return nodes.map((n) => renderNode(n, opts)).join("");
+/**
+ * Pushes a node list so it pops back in document order.
+ *
+ * Every traversal here uses an explicit stack rather than recursion. Rich text
+ * pasted from a word processor nests deeply, and a recursive walk gives out at
+ * a depth set by the engine's frame size and by how optimised the code already
+ * is — not by anything the document declares. A ceiling that moves with the
+ * state of the runtime can be neither predicted nor documented, so there is
+ * none here.
+ */
+function pushReversed(stack: unknown[], nodes: XhtmlNode[]): void {
+  for (let i = nodes.length - 1; i >= 0; i--) stack.push(nodes[i]);
 }
 
 /**
- * Renders an `<object>` element following the fallback chain described in
- * 10.8.20 #2: an image (PNG) takes priority, then a nested alternative
- * `<object>`, then plain alternative text/markup.
+ * Walks the `<object>` fallback chain of 10.8.20 #2: an image (PNG) takes
+ * priority, then a nested alternative `<object>`, then an attachment link,
+ * then the alternative content. Descending the chain is a tail call, so a loop
+ * replaces what used to be recursion.
  */
-function renderObject(node: XhtmlElementNode, opts: XhtmlRenderOptions): string {
-  const data = node.attributes["data"];
-  const declaredType = node.attributes["type"];
-  const resolved = data ? opts.attachments?.get(data) : undefined;
-  const mime = resolved?.mimeType ?? declaredType;
+function resolveObject(
+  node: XhtmlElementNode,
+  opts: XhtmlRenderOptions,
+): { html: string; children?: undefined } | { html?: undefined; children: XhtmlNode[] } {
+  let current = node;
+  for (;;) {
+    const data = current.attributes["data"];
+    const declaredType = current.attributes["type"];
+    const resolved = data ? opts.attachments?.get(data) : undefined;
+    const mime = resolved?.mimeType ?? declaredType;
 
-  if (resolved && mime?.startsWith("image/")) {
-    const width = node.attributes["width"];
-    const height = node.attributes["height"];
-    const w = width ? ` width="${escapeAttr(width)}"` : "";
-    const h = height ? ` height="${escapeAttr(height)}"` : "";
-    return `<img src="${escapeAttr(resolved.href)}"${w}${h} alt="" loading="lazy" style="max-width:100%" />`;
+    if (resolved && mime?.startsWith("image/")) {
+      const width = current.attributes["width"];
+      const height = current.attributes["height"];
+      const w = width ? ` width="${escapeAttr(width)}"` : "";
+      const h = height ? ` height="${escapeAttr(height)}"` : "";
+      return { html: `<img src="${escapeAttr(resolved.href)}"${w}${h} alt="" loading="lazy" style="max-width:100%" />` };
+    }
+
+    const nestedObject = current.children.find(
+      (c): c is XhtmlElementNode => c.type === "element" && c.tag === "object",
+    );
+    if (nestedObject) {
+      current = nestedObject;
+      continue;
+    }
+
+    if (resolved) {
+      const label = baseName(data ?? resolved.href);
+      return {
+        html: `<a class="reqif-attachment" href="${escapeAttr(resolved.href)}" download="${escapeAttr(label)}">\uD83D\uDCCE ${escapeHtml(label)}</a>`,
+      };
+    }
+
+    // Unresolved external object: fall back to whatever alt content was provided.
+    return { children: current.children };
   }
-
-  const nestedObject = node.children.find(
-    (c): c is XhtmlElementNode => c.type === "element" && c.tag === "object",
-  );
-  if (nestedObject) return renderObject(nestedObject, opts);
-
-  if (resolved) {
-    const label = baseName(data ?? resolved.href);
-    return `<a class="reqif-attachment" href="${escapeAttr(resolved.href)}" download="${escapeAttr(label)}">\uD83D\uDCCE ${escapeHtml(label)}</a>`;
-  }
-
-  // Unresolved external object: fall back to whatever alt content was provided.
-  return renderChildren(node.children, opts);
 }
 
-function renderElement(node: XhtmlElementNode, opts: XhtmlRenderOptions): string {
-  if (node.tag === "object") return renderObject(node, opts);
-  if (DROP_ENTIRELY_TAGS.has(node.tag)) {
-    reportDegradation(opts.onDegradation, "dropped-tag", `<${node.tag}> removed with its whole subtree.`, {
-      tag: node.tag,
-    });
-    return "";
-  }
-
-  if (!ALLOWED_TAGS.has(node.tag)) {
-    // Unknown/unsafe tag: drop the wrapper but keep rendering its content.
-    reportDegradation(opts.onDegradation, "unwrapped-tag", `<${node.tag}> unwrapped; its children were kept.`, {
-      tag: node.tag,
-    });
-    return renderChildren(node.children, opts);
-  }
-
+/** The opening tag's attributes, allowlisted and escaped. */
+function elementAttrs(node: XhtmlElementNode, opts: XhtmlRenderOptions): string {
   const attrParts: string[] = [];
   const style = sanitizeStyle(node.attributes["style"], opts);
   if (style) attrParts.push(`style="${escapeAttr(style)}"`);
@@ -169,45 +176,98 @@ function renderElement(node: XhtmlElementNode, opts: XhtmlRenderOptions): string
     }
   }
 
-  const attrs = attrParts.length ? " " + attrParts.join(" ") : "";
-  const VOID = node.tag === "br" || node.tag === "hr" || node.tag === "img" || node.tag === "col";
-  if (VOID) return `<${node.tag}${attrs} />`;
-  return `<${node.tag}${attrs}>${renderChildren(node.children, opts)}</${node.tag}>`;
+  return attrParts.length ? " " + attrParts.join(" ") : "";
 }
 
-function renderNode(node: XhtmlNode, opts: XhtmlRenderOptions): string {
-  if (node.type === "text") return escapeHtml(node.value);
-  return renderElement(node, opts);
+const VOID_TAGS = new Set(["br", "hr", "img", "col"]);
+
+/** Work item: a node still to render, or markup already decided (a closing tag). */
+type RenderStep = XhtmlNode | string;
+
+function renderNodes(nodes: XhtmlNode[], opts: XhtmlRenderOptions): string {
+  const out: string[] = [];
+  const stack: RenderStep[] = [];
+  pushReversed(stack, nodes);
+
+  while (stack.length) {
+    const step = stack.pop() as RenderStep;
+
+    // A closing tag queued behind its element's children.
+    if (typeof step === "string") {
+      out.push(step);
+      continue;
+    }
+    if (step.type === "text") {
+      out.push(escapeHtml(step.value));
+      continue;
+    }
+
+    if (step.tag === "object") {
+      const resolvedObject = resolveObject(step, opts);
+      if (resolvedObject.html !== undefined) out.push(resolvedObject.html);
+      else pushReversed(stack, resolvedObject.children);
+      continue;
+    }
+
+    if (DROP_ENTIRELY_TAGS.has(step.tag)) {
+      reportDegradation(opts.onDegradation, "dropped-tag", `<${step.tag}> removed with its whole subtree.`, {
+        tag: step.tag,
+      });
+      continue;
+    }
+
+    if (!ALLOWED_TAGS.has(step.tag)) {
+      // Unknown/unsafe tag: drop the wrapper but keep rendering its content.
+      reportDegradation(opts.onDegradation, "unwrapped-tag", `<${step.tag}> unwrapped; its children were kept.`, {
+        tag: step.tag,
+      });
+      pushReversed(stack, step.children);
+      continue;
+    }
+
+    const attrs = elementAttrs(step, opts);
+    if (VOID_TAGS.has(step.tag)) {
+      out.push(`<${step.tag}${attrs} />`);
+      continue;
+    }
+
+    out.push(`<${step.tag}${attrs}>`);
+    // The closing tag goes under the children, which pop first.
+    stack.push(`</${step.tag}>`);
+    pushReversed(stack, step.children);
+  }
+
+  return out.join("");
 }
 
 /** Renders a parsed XHTML fragment (an AttributeValueXHTML's content) to a safe HTML string. */
 export function renderXhtmlContent(content: XhtmlContent, opts: XhtmlRenderOptions = {}): string {
-  return renderChildren(content.nodes, opts);
+  return renderNodes(content.nodes, opts);
 }
 
 /** Plain-text extraction (e.g. for tooltips, search indexing, CSV export). */
 export function xhtmlToPlainText(content: XhtmlContent): string {
-  function collect(nodes: XhtmlNode[], out: string[]): void {
-    for (const n of nodes) {
-      if (n.type === "text") out.push(n.value);
-      else collect(n.children, out);
-    }
-  }
   const out: string[] = [];
-  collect(content.nodes, out);
+  const stack: XhtmlNode[] = [];
+  pushReversed(stack, content.nodes);
+  while (stack.length) {
+    const node = stack.pop() as XhtmlNode;
+    if (node.type === "text") out.push(node.value);
+    else pushReversed(stack, node.children);
+  }
   return out.join("").replace(/\s+/g, " ").trim();
 }
 
 /** Walks every `<object data="...">` / `<img src="...">` reference in a fragment. */
 export function collectReferencedPaths(content: XhtmlContent, out: Set<string> = new Set()): Set<string> {
-  function walk(nodes: XhtmlNode[]): void {
-    for (const n of nodes) {
-      if (n.type !== "element") continue;
-      if (n.tag === "object" && n.attributes["data"]) out.add(n.attributes["data"]);
-      if (n.tag === "img" && n.attributes["src"]) out.add(n.attributes["src"]);
-      walk(n.children);
-    }
+  const stack: XhtmlNode[] = [];
+  pushReversed(stack, content.nodes);
+  while (stack.length) {
+    const node = stack.pop() as XhtmlNode;
+    if (node.type !== "element") continue;
+    if (node.tag === "object" && node.attributes["data"]) out.add(node.attributes["data"]);
+    if (node.tag === "img" && node.attributes["src"]) out.add(node.attributes["src"]);
+    pushReversed(stack, node.children);
   }
-  walk(content.nodes);
   return out;
 }
