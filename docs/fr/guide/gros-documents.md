@@ -70,26 +70,21 @@ Tout ce qui précède concerne les documents qui échouent au parsing. Cette sec
 ceux qui se parsent très bien mais paraissent lents — et surtout quel réglage aide
 réellement, parce que les suppositions évidentes sont fausses.
 
-Mesuré sur un vrai export IBM DOORS de 4,94 Mo (1 024 exigences) et sur un fichier généré
-de 49,8 Mo, sous Node et sous Chrome :
+Le chargement construit le modèle ReqIF en mémoire. Le rendu produit une chaîne HTML. Le
+navigateur en construit ensuite le DOM, puis calcule sa mise en page. Le poids relatif de
+ces opérations dépend du contenu du document, du mode de rendu et de l'environnement —
+sous Node, les étapes DOM et mise en page n'existent pas.
 
-| Phase | 4,94 Mo | 49,8 Mo |
-|---|---|---|
-| Parsing XML vers le modèle | 278 ms | 3 554 ms |
-| Construction de `ReqIfIndex` | 0,5 ms | 9,3 ms |
-| Résolution des pièces jointes | 0,5 ms | 12,7 ms |
-| Rendu en chaîne | 99 ms | 3 217 ms |
-| **Insertion du HTML dans le DOM** | **550 ms** | **22 211 ms** |
+Aucun poste n'est désigné ici comme dominant. Deux corpus, mesurés séparément, l'ont placé
+à deux endroits différents : un temps ne vaut donc rien sans son fichier, son moteur et son
+banc. Mesurez ces étapes séparément sur vos propres fichiers pour trouver celle qui mérite
+d'être améliorée.
 
-Deux choses à en retenir. L'index ne coûte rien — ce n'est pas lui qu'il faut optimiser. Et
-le poste le plus lourd n'est pas dans cette bibliothèque : c'est le navigateur qui
-construit les nœuds à partir de la chaîne que vous affectez à `innerHTML`.
+### Différer le panneau technique
 
-### Le seul réglage qui aide
-
-Les deux tiers des nœuds émis sont le panneau technique, dans un `<details>` que personne
-n'a ouvert. Un `<details>` fermé saute la mise en page, mais ses nœuds sont construits
-quand même : ils sont donc payés plein tarif avant que quiconque demande à les voir.
+Chaque exigence porte un panneau technique replié qui liste ses attributs, et c'est la plus
+grande part du DOM que cette bibliothèque émet. Avec le défaut, ces éléments sont
+construits que quelqu'un ouvre le panneau ou non.
 
 ```ts
 const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
@@ -97,34 +92,35 @@ document.getElementById("preview")!.innerHTML = html;
 expandLazyPanels();
 ```
 
-Les nœuds que le navigateur doit construire passent de 69 par exigence à 29, ce qui divise
-à peu près par deux le temps d'insertion. Le balisage voyage toujours : la chaîne est donc
-~3 % plus grosse — le gain est à l'analyse et à la mise en page, pas au transfert.
+`"lazy"` conserve le contenu du panneau dans un bloc inerte et diffère la construction de
+ses éléments DOM jusqu'à leur expansion par JavaScript. Il réduit le DOM initial. Il ne
+réduit pas la chaîne HTML — qui s'allonge un peu, le contenu voyageant toujours — et ne
+promet aucun rapport sur le temps : savoir s'il paie dépend du document, donc mesurez-le
+sur le vôtre.
 
 `expandLazyPanels()` est obligatoire : voir
 [Faire fonctionner les panneaux paresseux](/fr/api/#faire-fonctionner-les-panneaux-paresseux)
 pour la raison, et pour le cas du rendu serveur. Si vous n'avez pas besoin du panneau,
-`technicalPanel: "off"` est plus léger encore et ne demande rien.
+`technicalPanel: "off"` le supprime entièrement — avec les informations qu'il affiche — et
+ne demande rien.
 
 ### À quoi s'attendre, et ce qui n'aidera pas
 
-Le parsing est un appel synchrone indivisible : environ 0,3 s à 5 Mo et 3,5 s à 50 Mo,
-pendant lesquelles la page est figée. La montée est quasi linéaire — dix fois l'entrée
-coûte environ treize fois le temps — il n'y a donc pas de mur, juste un coût régulier. Le
-déplacer dans un Web Worker est la seule chose qui le retire du fil principal, et le
-modèle qu'il produit survit à `structuredClone` ; le résolveur de pièces jointes, non, car
-il porte des méthodes.
+Le parsing est un appel synchrone indivisible, pendant lequel la page est figée. Le
+déplacer dans un Web Worker est la seule chose qui le retire du fil principal, et le modèle
+qu'il produit survit à `structuredClone` ; le résolveur de pièces jointes, non, car il
+porte des méthodes.
 
-Le pic mémoire est la limite la plus dure : **25 à 56 fois la taille du fichier d'entrée**,
-1,28 Go pour 49,8 Mo. C'est ce qui tuera un onglet avant les secondes, et aucune option
-ici n'y change quoi que ce soit — le modèle est construit entièrement en mémoire, en un
-seul passage.
+Le pic mémoire est la limite la plus dure, et c'est lui qui tuera un onglet avant les
+secondes. Le modèle est construit entièrement en mémoire, en un seul passage, et aucune
+option ici n'y change quoi que ce soit. Un chargement coûte un multiple de la taille du
+fichier plutôt que cette taille, et ce multiple dépend du document — le seul chiffre qui
+vaille est donc celui que vous mesurez sur les fichiers que vous ouvrez vraiment.
 
 ::: tip Mesurez votre propre fichier
-Les chiffres ci-dessus portent sur deux documents ; ceux qui comptent sont les vôtres. La
-taille d'un fichier en dit moins que la profondeur du texte riche qu'il contient —
-l'export DOORS ci-dessus coûte 56 fois sa taille en mémoire quand le fichier généré en
-coûte 25, pour la même raison que ses nœuds par exigence sont plus nombreux.
+La taille d'un fichier en dit moins que ce qu'il contient : deux documents de même taille
+peuvent différer largement en temps comme en mémoire, selon le nombre d'attributs que porte
+chaque exigence et la profondeur de son texte riche.
 
 ```ts
 const started = performance.now();

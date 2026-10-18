@@ -134,11 +134,12 @@ export interface RenderOptions {
    *
    * - `"eager"` (default) writes the panel out in full. No JavaScript at all,
    *   and nothing for the caller to do.
-   * - `"lazy"` ships the panel's markup inside an inert
-   *   `<script type="application/reqif-panel">` block and builds it when the
-   *   panel is first opened. The panel is two thirds of all emitted nodes, and
-   *   inserting nodes into the DOM is the largest cost of displaying a
-   *   document, so this roughly halves the wait on a heavy file.
+   * - `"lazy"` ships the panel's content inside an inert
+   *   `<script type="application/reqif-panel">` block and builds its elements
+   *   when the panel is first opened. The panel is most of the emitted DOM, so
+   *   this leaves a smaller initial tree; the content still travels, so the
+   *   string is slightly longer, and what it buys in time depends on the
+   *   document.
    * - `"off"` omits it entirely.
    *
    * `"lazy"` is **opt-in rather than the default** because it does not work on

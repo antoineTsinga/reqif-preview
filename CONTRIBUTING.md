@@ -16,7 +16,7 @@ l'intuition. Le premier décompose chaque phase ; le second donne les deux chiff
 Node ne peut pas produire — l'insertion dans le DOM et la plus longue tâche bloquante.
 
 ```bash
-npm run bench          # par phase, un process enfant par fixture (pic mémoire exact)
+npm run bench          # par phase, un process enfant par fixture
 npm run bench:browser  # insertion DOM + plus longue tâche, à lire dans le navigateur
 ```
 
@@ -24,6 +24,12 @@ npm run bench:browser  # insertion DOM + plus longue tâche, à lire dans le nav
 gitignorée. L'export DOORS de 5 Mo est gitignoré lui aussi : s'il manque, le cas est
 ignoré et le banc le dit, plutôt que de laisser lire un tableau incomplet comme s'il était
 complet.
+
+Deux limites à connaître avant de citer un de ces chiffres. Le banc Node rapporte le
+plus-haut RSS du processus de benchmark, lequel exécute plusieurs phases et répétitions
+pour une fixture : cette valeur n'est ni le pic d'un chargement unique, ni la RAM minimale
+requise. Et le comparatif navigateur exécute les variantes dans un ordre fixe, donc ses
+écarts ne s'interprètent pas comme l'effet isolé du mode.
 
 ## Le site de documentation
 

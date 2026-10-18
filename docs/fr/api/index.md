@@ -99,17 +99,17 @@ claire.
 Chaque exigence porte un panneau « Détails techniques » replié qui liste tous ses
 attributs, et `technicalPanel` décide de la façon dont il est émis.
 
-| Valeur | Ce qu'elle émet | Nœuds par exigence |
-|---|---|---|
-| `"eager"` (défaut) | le panneau, en entier | 69 |
-| `"lazy"` | son balisage dans un bloc inerte, construit à l'ouverture | 29 |
-| `"off"` | rien | 26 |
+| Valeur | Ce qu'elle émet |
+|---|---|
+| `"eager"` (défaut) | le panneau, en entier |
+| `"lazy"` | son contenu dans un bloc inerte, construit en éléments DOM à l'ouverture |
+| `"off"` | rien |
 
-Le défaut l'écrit, ce qui ne demande aucun JavaScript et rien de votre part. Passez à
-`"lazy"` quand un fichier est assez gros pour que l'écart compte — voir
-[Fichiers lourds](/fr/guide/gros-documents#fichiers-lourds) pour les mesures et pour savoir
-quand ça vaut le coup. `"off"` est plus léger encore si vous ne voulez simplement pas du
-panneau.
+Le défaut l'écrit, ce qui ne demande aucun JavaScript et rien de votre part. `"lazy"` donne
+un DOM initial plus petit sur un gros fichier, au prix d'un appel d'initialisation et d'une
+chaîne un peu plus longue — voir
+[Fichiers lourds](/fr/guide/gros-documents#fichiers-lourds) pour savoir comment choisir.
+`"off"` supprime le panneau entièrement si vous n'en voulez simplement pas.
 
 ### Faire fonctionner les panneaux paresseux
 

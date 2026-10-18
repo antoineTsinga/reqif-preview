@@ -97,16 +97,16 @@ surface.
 Each requirement carries a collapsed "Technical details" panel listing every attribute,
 and `technicalPanel` decides how it is emitted.
 
-| Value | What it emits | Nodes per requirement |
-|---|---|---|
-| `"eager"` (default) | the panel, in full | 69 |
-| `"lazy"` | its markup in an inert block, built when opened | 29 |
-| `"off"` | nothing | 26 |
+| Value | What it emits |
+|---|---|
+| `"eager"` (default) | the panel, in full |
+| `"lazy"` | its content in an inert block, built into DOM elements when opened |
+| `"off"` | nothing |
 
-The default writes it out, which needs no JavaScript and nothing from you. Reach for
-`"lazy"` when a file is big enough that the difference matters — see
-[Heavy files](/guide/large-documents#heavy-files) for the measurements and for when it is
-worth it. `"off"` is lighter still if you simply do not want the panel.
+The default writes it out, which needs no JavaScript and nothing from you. `"lazy"` gives a
+smaller initial DOM on a large file, at the price of an initialisation call and a slightly
+longer string — see [Heavy files](/guide/large-documents#heavy-files) for how to decide.
+`"off"` drops the panel entirely if you simply do not want it.
 
 ### Making lazy panels open
 
