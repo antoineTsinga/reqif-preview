@@ -35,7 +35,7 @@ import { loadReqIfPackage, renderPackageToHtml /* … */ } from "reqif-preview";
 
 ## Ce qui peut lever
 
-Une seule chose : le **parsing**.
+Le parsing, sous la forme d'un `ReqIfParseError`.
 
 ```ts
 import { ReqIfParseError } from "reqif-preview";
@@ -44,11 +44,17 @@ try {
   const pkg = await loadReqIfPackage(bytes);
 } catch (e) {
   if (e instanceof ReqIfParseError) { /* XML invalide, zip corrompu, racine absente… */ }
+  else throw e;                          // le reste ne nous appartient pas
 }
 ```
 
-Passé ce point, plus rien ne lève : les fonctions de rendu dégradent localement et
-poursuivent. Pour savoir *ce qui* a été dégradé, voir [Diagnostics](/fr/api/diagnostics).
+Passé ce point, les fonctions de rendu dégradent localement et poursuivent au lieu
+d'échouer. Pour savoir *ce qui* a été dégradé, voir [Diagnostics](/fr/api/diagnostics).
+
+Ce n'est pas pour autant une protection contre toute exception : la hiérarchie de
+spécifications et la sérialisation d'un arbre retourné par `customAttributeRenderers`
+restent parcourues récursivement, donc une imbrication extrême peut se manifester par un
+`RangeError`.
 
 ## Feuille de style
 

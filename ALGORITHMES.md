@@ -169,7 +169,7 @@ function parseSpecHierarchy(node: XNode): SpecHierarchy {
 }
 ```
 
-La profondeur de récursion JS correspond ici directement à la profondeur de l'arbre ReqIF — c'est exactement ce que `maxNestedTags` borne en amont, empêchant un débordement de pile sur un document pathologique.
+La profondeur de récursion JS correspond ici directement à la profondeur de l'arbre ReqIF. `maxNestedTags` borne l'imbrication XML en amont, mais ne protège pas ce parcours : la pile d'appels peut céder avant que la limite configurée soit atteinte, et l'erreur est alors un `RangeError` et non un `ReqIfParseError`.
 
 ---
 
@@ -197,7 +197,7 @@ function xNodeToXhtml(node: XNode): XhtmlNode {
     type: "element",
     tag: tagOf(node)!.toLowerCase(),       // "xhtml:div" déjà devenu "div" via removeNSPrefix
     attributes: lowercased(attrsOf(node)),
-    children: childrenOf(node).map(xNodeToXhtml), // récursion
+    children: [],                           // remplis ensuite, via une pile explicite
   };
 }
 ```
@@ -233,7 +233,7 @@ Une fois construit, résoudre `typeRef`/`definitionRef`/`objectRef`/... coûte *
 
 ## 6. Assainissement (sanitization) du XHTML
 
-Le contenu XHTML d'un fichier ReqIF est une **donnée non fiable** (provenant d'un tiers), même si le format ne permet en théorie que des balises "sûres". `sanitize.ts` applique un algorithme de **liste blanche récursive en trois catégories** :
+Le contenu XHTML d'un fichier ReqIF est une **donnée non fiable** (provenant d'un tiers), même si le format ne permet en théorie que des balises "sûres". `sanitize.ts` applique un algorithme de **liste blanche en trois catégories**, sur une pile explicite plutôt que par récursion :
 
 ```
 pour chaque nœud de l'arbre XhtmlNode :
@@ -266,18 +266,23 @@ La clause 10.8.20 de la spec décrit un mécanisme de repli pour les objets exte
 </object>
 ```
 
-`renderObject` implémente ça par récursion directe sur les enfants :
+Descendre cette chaîne est un appel terminal, donc `resolveObject` l'implémente par une boucle :
 
 ```ts
-function renderObject(node): string {
-  const resolved = opts.attachments?.get(node.attributes["data"]);
-  if (resolved && mime.startsWith("image/")) return `<img src="${resolved.href}" ... />`;       // 1. image résolue
-  const nestedObject = node.children.find(c => c.tag === "object");
-  if (nestedObject) return renderObject(nestedObject, opts);                                     // 2. objet alternatif (récursion)
-  if (resolved) return `<a download="...">📎 ...</a>`;                                           // 3. fichier non-image résolu → lien de téléchargement
-  return renderChildren(node.children, opts);                                                    // 4. rien résolu → texte alternatif tel quel
+function resolveObject(node, opts) {
+  let current = node;
+  for (;;) {
+    const resolved = opts.attachments?.get(current.attributes["data"]);
+    if (resolved && mime.startsWith("image/")) return { html: `<img src="..." ... />` };      // 1. image résolue
+    const nested = current.children.find(c => c.tag === "object");
+    if (nested) { current = nested; continue; }                                                // 2. objet alternatif
+    if (resolved) return { html: `<a download="...">📎 ...</a>` };                             // 3. non-image résolu → lien
+    return { children: current.children };                                                     // 4. rien résolu → texte alternatif
+  }
 }
 ```
+
+Les quatre parcours de l'arbre XHTML — conversion, rendu assaini, extraction du texte et collecte des chemins — utilisent une pile explicite pour la même raison : une profondeur de récursion dépendant du moteur et de l'état du runtime n'est ni prévisible ni documentable. La hiérarchie de spécifications et la sérialisation des arbres retournés par un renderer personnalisé, elles, restent récursives.
 
 ### Assainissement de l'attribut `style`
 

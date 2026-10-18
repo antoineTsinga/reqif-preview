@@ -22,12 +22,17 @@ document, with a `Maximum nested tags exceeded` error.
 const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 200 });
 ```
 
-Raising the guard raises the parser's ceiling, not every ceiling. Deeply nested rich text
-inside an attribute is walked without recursion and goes as deep as the guard allows. A
-deeply nested **specification hierarchy** is not: it is still walked recursively, so a
-hierarchy thousands of levels deep can exhaust the call stack before the configured limit
-is reached, and the error you get then is a `RangeError` rather than a `ReqIfParseError`.
-Hierarchies that deep do not occur in exports written by the usual tools.
+Raising the guard raises the parser's ceiling, not every ceiling, and note that
+`maxNestedTags` counts XML nesting across the whole document rather than the depth of one
+attribute's rich text.
+
+Converting, sanitising, rendering and scanning an attribute's rich text no longer use the
+JavaScript call stack for that traversal, so those four are not what gives out first. The
+**specification hierarchy** is still walked recursively, and so is the serialisation of a
+tree returned by a `customAttributeRenderers` callback: either can exhaust the call stack,
+and the error is then a `RangeError` rather than a `ReqIfParseError`. Where exactly that
+happens depends on the engine and on the stack available at the time, so no maximum depth
+is claimed here.
 
 ## XML entities
 
@@ -59,12 +64,19 @@ In that second case, `maxNestedTags: 200` and `fast-xml-parser`'s own entity def
 a reasonable starting point — at the cost of rejecting some legitimate documents.
 :::
 
-## What, by contrast, never throws
+## What, by contrast, degrades
 
-Both of these errors come from the **parsing** stage, the only one that can fail. Past
-that point nothing throws: a surprising input degrades locally and the rest of the
-document still renders. See [Diagnostics](/guide/diagnostics) for making those decisions
-visible.
+Both of these errors come from the **parsing** stage, and they arrive as `ReqIfParseError`.
+Past that point the rendering degrades locally instead of failing: a surprising input, a
+callback of yours that throws, an attachment that cannot be read — each costs you that one
+thing and the rest of the document still renders. See
+[Diagnostics](/guide/diagnostics) for making those decisions visible.
+
+That is not a guarantee that nothing can throw. Two walks are still recursive — the
+specification hierarchy, and the serialisation of trees returned by a
+`customAttributeRenderers` callback — so a document or a callback nesting thousands of
+levels deep can exhaust the call stack, which surfaces as a `RangeError` rather than a
+degradation.
 
 ## Heavy files
 

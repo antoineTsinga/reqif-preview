@@ -35,7 +35,7 @@ import { loadReqIfPackage, renderPackageToHtml /* … */ } from "reqif-preview";
 
 ## What can throw
 
-One thing only: **parsing**.
+Parsing, as `ReqIfParseError`.
 
 ```ts
 import { ReqIfParseError } from "reqif-preview";
@@ -44,11 +44,16 @@ try {
   const pkg = await loadReqIfPackage(bytes);
 } catch (e) {
   if (e instanceof ReqIfParseError) { /* invalid XML, corrupt zip, missing root… */ }
+  else throw e;                          // anything else is not ours to swallow
 }
 ```
 
-Past that point nothing throws: the rendering functions degrade locally and carry on. To
-learn *what* was degraded, see [Diagnostics](/api/diagnostics).
+Past that point the rendering functions degrade locally and carry on rather than failing.
+To learn *what* was degraded, see [Diagnostics](/api/diagnostics).
+
+They are not proof against every exception, though: the specification hierarchy and the
+serialisation of a tree returned by `customAttributeRenderers` are still walked
+recursively, so extreme nesting can surface as a `RangeError`.
 
 ## Stylesheet
 

@@ -23,13 +23,17 @@ limite sur un document par ailleurs légitime, avec une erreur
 const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 200 });
 ```
 
-Relever le garde-fou relève le plafond du parseur, pas tous les plafonds. Du texte enrichi
-profondément imbriqué dans un attribut est parcouru sans récursion et va aussi profond que
-le garde-fou l'autorise. Une **hiérarchie de spécifications** profonde, non : elle est
-encore parcourue récursivement, donc une hiérarchie de plusieurs milliers de niveaux peut
-épuiser la pile d'appels avant d'atteindre la limite configurée, et l'erreur obtenue est
-alors un `RangeError` plutôt qu'un `ReqIfParseError`. Les hiérarchies de cette profondeur
-n'apparaissent pas dans les exports des outils usuels.
+Relever le garde-fou relève le plafond du parseur, pas tous les plafonds — et notez que
+`maxNestedTags` compte l'imbrication XML de tout le document, pas la profondeur du texte
+enrichi d'un seul attribut.
+
+Convertir, assainir, rendre et parcourir le texte enrichi d'un attribut n'utilisent plus la
+pile d'appels JavaScript pour cette traversée : ce ne sont donc pas ces quatre-là qui
+cèdent en premier. La **hiérarchie de spécifications** reste parcourue récursivement, de
+même que la sérialisation d'un arbre retourné par un callback `customAttributeRenderers` :
+l'une comme l'autre peut épuiser la pile, et l'erreur est alors un `RangeError` plutôt
+qu'un `ReqIfParseError`. Où cela survient dépend du moteur et de la pile disponible à cet
+instant, donc aucune profondeur maximale n'est annoncée ici.
 
 ## Entités XML
 
@@ -64,12 +68,19 @@ d'entités de `fast-xml-parser` sont un point de départ raisonnable — au prix
 certains documents légitimes.
 :::
 
-## Ce qui, en revanche, ne lève jamais
+## Ce qui, en revanche, dégrade
 
-Ces deux erreurs viennent de l'étape de **parsing**, la seule qui peut échouer. Passé ce
-point, plus rien ne lève : une entrée surprenante dégrade localement et le reste du
-document se rend quand même. Voir [Diagnostics](/fr/guide/diagnostics) pour rendre ces
-décisions visibles.
+Les deux erreurs ci-dessus viennent de l'étape de **parsing**, et arrivent sous la forme
+d'un `ReqIfParseError`. Passé ce point, le rendu dégrade localement au lieu d'échouer :
+une entrée surprenante, un de vos callbacks qui lève, une pièce jointe illisible — chacun
+vous coûte cette seule chose, et le reste du document se rend quand même. Voir
+[Diagnostics](/fr/guide/diagnostics) pour rendre ces décisions visibles.
+
+Ce n'est pas une garantie que rien ne peut lever. Deux parcours restent récursifs — la
+hiérarchie de spécifications, et la sérialisation des arbres retournés par un callback
+`customAttributeRenderers` — donc un document ou un callback imbriqué sur des milliers de
+niveaux peut épuiser la pile d'appels, ce qui se manifeste par un `RangeError` et non par
+une dégradation.
 
 ## Fichiers lourds
 

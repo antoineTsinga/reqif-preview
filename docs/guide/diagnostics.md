@@ -2,8 +2,8 @@
 
 <!--@include: ../_conventions.md-->
 
-Past the parsing stage, **nothing throws**. A surprising input degrades locally and the
-rest of the document still renders. That is the right behaviour in production — a
+Past the parsing stage, the render **degrades instead of failing**. A surprising input
+costs you that one thing and the rest of the document still renders. That is the right behaviour in production — a
 requirements preview beats a blank page — and a miserable one in support: faced with
 "things are missing from my preview", there is nothing to inspect.
 

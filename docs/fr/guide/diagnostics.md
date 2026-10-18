@@ -2,8 +2,8 @@
 
 <!--@include: ../_conventions.md-->
 
-Passé l'étape de parsing, **rien ne lève**. Une entrée surprenante dégrade localement et le
-reste du document se rend quand même. C'est le bon comportement en production — un aperçu
+Passé l'étape de parsing, le rendu **dégrade au lieu d'échouer**. Une entrée surprenante
+ne vous coûte que cette chose-là, et le reste du document se rend quand même. C'est le bon comportement en production — un aperçu
 d'exigences vaut mieux qu'une page blanche — et c'est pénible en support : face à « il
 manque des trucs dans mon aperçu », il n'y avait aucun moyen d'obtenir un rapport.
 
