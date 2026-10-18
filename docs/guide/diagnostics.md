@@ -2,10 +2,14 @@
 
 <!--@include: ../_conventions.md-->
 
-Past the parsing stage, the render **degrades instead of failing**. A surprising input
-costs you that one thing and the rest of the document still renders. That is the right behaviour in production — a
-requirements preview beats a blank page — and a miserable one in support: faced with
-"things are missing from my preview", there is nothing to inspect.
+The cases listed below **degrade locally and emit a diagnostic**: a surprising input costs
+you that one thing and the rest of the document still renders. That is the right behaviour
+in production — a requirements preview beats a blank page — and a miserable one in support:
+faced with "things are missing from my preview", there is nothing to inspect.
+
+This mechanism does not cover every exception. The walks that are still recursive have
+their own limits, described in
+[Deeply nested documents](/guide/large-documents#what-by-contrast-degrades).
 
 ```ts
 import type { DegradationEvent } from "reqif-preview";

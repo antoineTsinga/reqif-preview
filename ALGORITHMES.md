@@ -188,19 +188,7 @@ Le contenu XHTML traverse **deux représentations distinctes**, jamais une seule
 1. **`XNode`** (interne, propre à `fast-xml-parser`, jamais exposé dans l'API publique)
 2. **`XhtmlNode`** (`{ type: "element", tag, attributes, children }` ou `{ type: "text", value }` — défini dans `types.ts`, complètement indépendant de la bibliothèque de parsing)
 
-`xhtml.ts` fait la traversée de conversion :
-
-```ts
-function xNodeToXhtml(node: XNode): XhtmlNode {
-  if (isTextNode(node)) return { type: "text", value: textOf(node) };
-  return {
-    type: "element",
-    tag: tagOf(node)!.toLowerCase(),       // "xhtml:div" déjà devenu "div" via removeNSPrefix
-    attributes: lowercased(attrsOf(node)),
-    children: [],                           // remplis ensuite, via une pile explicite
-  };
-}
-```
+`xhtml.ts` fait la traversée de conversion, sans jamais se rappeler récursivement : `shellOf` crée la coquille d'un nœud — un nœud texte, ou un élément dont le tag et les attributs sont minusculisés, avec `children` vide — puis une boucle dépile des couples nœud source / nœud cible. Pour chaque couple, elle crée la coquille de chaque enfant, l'attache dans l'ordre du document, et empile les enfants qui sont eux-mêmes des éléments. Le préfixe de namespace a déjà disparu à l'arrivée, `removeNSPrefix` étant actif, donc « xhtml:div » arrive comme « div ».
 
 **Pourquoi cette indirection plutôt que d'exposer `XNode` directement ?** Découpler la forme publique (`XhtmlNode`) de l'implémentation interne du parseur (`XNode`) signifie qu'on pourrait remplacer `fast-xml-parser` par n'importe quel autre parseur XML sans casser l'API publique ni le sanitizer (section 6), qui ne connaît que `XhtmlNode`.
 
@@ -249,7 +237,7 @@ pour chaque nœud de l'arbre XhtmlNode :
      ALLOWED_TAGS           → balise conservée, attributs filtrés
      (div, p, table...)      (seuls `style` et `title`, plus quelques
                               attributs spécifiques par balise comme
-                              `colspan`/`href`), enfants récursés
+                              `colspan`/`href`), enfants parcourus sur la pile
 ```
 
 La distinction entre les deux derniers cas est importante : un `<font>` ou un `<center>` (pas dans la liste blanche, mais inoffensif) garde son texte visible ; un `<script>alert(1)</script>` (dans `DROP_ENTIRELY_TAGS`) disparaît **entièrement**, contenu compris — sinon le texte `alert(1)` apparaîtrait, non exécuté mais visible inutilement.
@@ -306,7 +294,7 @@ Si ce n'est pas un ZIP, le contenu est traité comme du XML brut. Si c'est un ZI
 
 ### Pourquoi deux passes (collecte puis résolution) au rendu
 
-Le rendu HTML produit une **chaîne synchrone**, mais lire les octets d'une pièce jointe est **asynchrone** (`getBytes(): Promise<Uint8Array>`). Plutôt que de rendre toute la fonction de sérialisation HTML asynchrone (ce qui complexifierait chaque petite fonction récursive de `sanitize.ts`), le rendu est scindé en deux phases nettement séparées :
+Le rendu HTML produit une **chaîne synchrone**, mais lire les octets d'une pièce jointe est **asynchrone** (`getBytes(): Promise<Uint8Array>`). Plutôt que de rendre toute la fonction de sérialisation HTML asynchrone (ce qui complexifierait chaque petite fonction de `sanitize.ts`), le rendu est scindé en deux phases nettement séparées :
 
 ```
 Phase 1 (async, une seule fois par document) :
@@ -316,7 +304,7 @@ Phase 1 (async, une seule fois par document) :
     → Promise.all(...)                      // résout + lit chaque pièce jointe EN PARALLÈLE
     → Map<chemin, { href: data-URI, mimeType }>   ("AttachmentLookup")
 
-Phase 2 (synchrone, récursive, peut être appelée autant de fois que nécessaire) :
+Phase 2 (synchrone, itérative, peut être appelée autant de fois que nécessaire) :
   renderXhtmlContent(content, { attachments: lookupPhase1 })
     → AttachmentLookup.get(path) est un simple lookup de Map, donc instantané
 ```

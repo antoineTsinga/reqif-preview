@@ -2,10 +2,15 @@
 
 <!--@include: ../_conventions.md-->
 
-Passé l'étape de parsing, le rendu **dégrade au lieu d'échouer**. Une entrée surprenante
-ne vous coûte que cette chose-là, et le reste du document se rend quand même. C'est le bon comportement en production — un aperçu
-d'exigences vaut mieux qu'une page blanche — et c'est pénible en support : face à « il
-manque des trucs dans mon aperçu », il n'y avait aucun moyen d'obtenir un rapport.
+Les cas listés ci-dessous **dégradent localement et émettent un diagnostic** : une entrée
+surprenante ne vous coûte que cette chose-là, et le reste du document se rend quand même.
+C'est le bon comportement en production — un aperçu d'exigences vaut mieux qu'une page
+blanche — et c'est pénible en support : face à « il manque des trucs dans mon aperçu », il
+n'y avait aucun moyen d'obtenir un rapport.
+
+Ce mécanisme ne couvre pas toute exception. Les parcours encore récursifs ont leurs propres
+limites, décrites dans
+[Documents très imbriqués](/fr/guide/gros-documents#ce-qui-en-revanche-degrade).
 
 ```ts
 import type { DegradationEvent } from "reqif-preview";
