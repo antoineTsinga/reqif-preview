@@ -29,6 +29,7 @@ craindre un changement de comportement.
 |---|---|
 | `attachment-missing` | pièce jointe référencée qu'aucun résolveur ne trouve |
 | `attachment-too-large` | pièce jointe dépassant `maxInlineBytes`, laissée non résolue |
+| `attachment-unreadable` | résolveur qui a levé ou rejeté, pièce jointe laissée non résolue |
 | `unresolved-reference` | `SpecRelation` visant un objet absent du rendu |
 | `duplicate-dom-id` | objet rendu plusieurs fois ; seule la première occurrence porte l'`id` |
 | `orphan-attribute-value` | valeur dont l'`AttributeDefinition` est absente du `SpecType` déclaré |
@@ -74,7 +75,7 @@ casse ce qu'il observe serait pire que pas de canal du tout.
 
 | Symptôme rapporté | Code à chercher |
 |---|---|
-| « Les images ne s'affichent pas » | `attachment-missing`, `attachment-too-large` |
+| « Les images ne s'affichent pas » | `attachment-missing`, `attachment-too-large`, `attachment-unreadable` |
 | « Ce lien de traçabilité ne mène nulle part » | `unresolved-reference` |
 | « Cliquer sur un lien m'amène au mauvais endroit » | `duplicate-dom-id` |
 | « Il manque une exigence entière » | `missing-spec-object` |

@@ -17,6 +17,8 @@ export type DegradationCode =
   | "attachment-missing"
   /** A referenced attachment exceeded `maxInlineBytes` and was left unresolved. */
   | "attachment-too-large"
+  /** The caller's resolver threw or rejected; the attachment was left unresolved. */
+  | "attachment-unreadable"
   /** A SpecRelation pointed at a SpecObject that is nowhere in the render. */
   | "unresolved-reference"
   /** A value whose AttributeDefinition is absent from the declared SpecType. */
@@ -55,6 +57,28 @@ export interface DegradationEvent {
 }
 
 export type DegradationHandler = (event: DegradationEvent) => void;
+
+const UNDESCRIBABLE = "unavailable: describing the thrown value threw";
+
+/**
+ * Describes a thrown value without being able to throw in turn.
+ *
+ * A rejection can be anything a `throw` accepts: an object with a null
+ * prototype, one whose `toString` throws, an `Error` whose `message` getter
+ * throws. A catch block that formats its own cause is the one place where
+ * that formatting undoes the guard that caught it.
+ */
+export function describeThrown(error: unknown): string {
+  try {
+    const message = error instanceof Error ? error.message : undefined;
+    if (typeof message === "string" && message) return message;
+    const described = String(error);
+    if (described) return described;
+  } catch {
+    // Falls through: whatever this value is, it cannot be described.
+  }
+  return UNDESCRIBABLE;
+}
 
 /**
  * Delivers one event, defensively.

@@ -6,7 +6,7 @@ import { DEFAULT_JS, LAZY_ATTR, PANEL_SCRIPT_TYPE, escapePanelPayload } from "./
 import { resolveAttribute, valueToPlainText } from "./attribute-lookup.js";
 import { extractLifecycleInfo } from "./lifecycle.js";
 import { renderTabs } from "./tabs.js";
-import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
+import { describeThrown, reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import {
   buildAttributeRenderContext,
   collectHiddenDefinitionIds,
@@ -986,24 +986,43 @@ export async function createAttachmentLookup(
   const resolved = new Map<string, { href: string; mimeType?: string }>();
   await Promise.all(
     [...paths].map(async (path) => {
-      const attachment = resolver.resolve(path);
-      if (!attachment) {
-        reportDegradation(onDegradation, "attachment-missing", `No attachment resolved for "${path}".`, { path });
-        return;
-      }
-      if (attachment.size > maxInlineBytes) {
-        // too big to inline; left unresolved on purpose
+      // The resolver is caller code: `resolve` may throw and `getBytes` may
+      // reject, over a missing file, a closed archive or a network error.
+      // Losing the whole document because one image could not be read would
+      // contradict the two degradations just below, which keep rendering for
+      // the very same feature.
+      let step: "resolve" | "read" = "resolve";
+      try {
+        const attachment = resolver.resolve(path);
+        if (!attachment) {
+          reportDegradation(onDegradation, "attachment-missing", `No attachment resolved for "${path}".`, { path });
+          return;
+        }
+        if (attachment.size > maxInlineBytes) {
+          // too big to inline; left unresolved on purpose
+          reportDegradation(
+            onDegradation,
+            "attachment-too-large",
+            `Attachment "${path}" (${attachment.size} bytes) exceeds maxInlineBytes (${maxInlineBytes}).`,
+            { path, size: attachment.size, maxInlineBytes },
+          );
+          return;
+        }
+        step = "read";
+        const bytes = await attachment.getBytes();
+        const mimeType = attachment.mimeType ?? "application/octet-stream";
+        resolved.set(path, { href: `data:${mimeType};base64,${toBase64(bytes)}`, mimeType });
+      } catch (error) {
+        // Left unresolved, so the renderer falls back to the alternative
+        // content the document provides for this object.
+        const reason = describeThrown(error);
         reportDegradation(
           onDegradation,
-          "attachment-too-large",
-          `Attachment "${path}" (${attachment.size} bytes) exceeds maxInlineBytes (${maxInlineBytes}).`,
-          { path, size: attachment.size, maxInlineBytes },
+          "attachment-unreadable",
+          `Attachment "${path}" could not be ${step === "resolve" ? "resolved" : "read"}: ${reason}`,
+          { path, step },
         );
-        return;
       }
-      const bytes = await attachment.getBytes();
-      const mimeType = attachment.mimeType ?? "application/octet-stream";
-      resolved.set(path, { href: `data:${mimeType};base64,${toBase64(bytes)}`, mimeType });
     }),
   );
 

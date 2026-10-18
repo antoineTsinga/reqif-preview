@@ -2,7 +2,7 @@ import { resolveAttribute } from "./attribute-lookup.js";
 import { escapeAttr, escapeHtml } from "./escape.js";
 import { isBalancedHtml } from "./html-balance.js";
 import { ReqIfIndex } from "./lookup.js";
-import { reportDegradation, type DegradationHandler } from "./diagnostics.js";
+import { describeThrown, reportDegradation, type DegradationHandler } from "./diagnostics.js";
 import { sanitizeHref, type AttachmentLookup } from "./sanitize.js";
 import type { AttributeDefinition, AttributeValue, SpecObject, SpecType } from "./types.js";
 
@@ -228,7 +228,7 @@ export function renderCustomAttributes(
         onDegradation,
         "custom-renderer-threw",
         `The renderer for attribute "${renderer.attribute}" threw; it was skipped for this object.`,
-        { attribute: renderer.attribute, specObject: ctx.specObject.identifier, error: String(error) },
+        { attribute: renderer.attribute, specObject: ctx.specObject.identifier, error: describeThrown(error) },
       );
       continue;
     }
