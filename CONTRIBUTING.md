@@ -18,7 +18,20 @@ Node ne peut pas produire — l'insertion dans le DOM et la plus longue tâche b
 ```bash
 npm run bench          # par phase, un process enfant par fixture
 npm run bench:browser  # insertion DOM + plus longue tâche, à lire dans le navigateur
+npm run bench:code     # banc indépendant : contrôles fonctionnels puis mesures Node
+npm run bench:code:checks  # les seuls contrôles fonctionnels, sans mesure
 ```
+
+`bench:code` vient d'une revue croisée : il a été écrit contre `src/` sans emprunter aux
+deux autres bancs, et ses trois fichiers sont ceux de l'artefact audité, octet pour octet,
+pour que leur empreinte reste vérifiable. Ses 18 contrôles fonctionnels **échouent en se
+nommant**, il génère ses propres entrées de façon reproductible, il lance un processus par
+cas et par échantillon, et il déclare les phases qu'aucune entrée n'exerce au lieu
+d'afficher un temps pour elles. C'est aussi lui qui refuse de publier des parts de
+pipeline, les opérations mesurées se recouvrant.
+
+Il ne mesure que des appels d'API Node : jamais l'insertion dans le DOM ni une latence
+perçue.
 
 `npm run bench` génère à la demande une fixture synthétique de ~50 Mo dans `.bench/`,
 gitignorée. L'export DOORS de 5 Mo est gitignoré lui aussi : s'il manque, le cas est
