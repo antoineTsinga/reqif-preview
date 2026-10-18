@@ -18,22 +18,29 @@ limite sur un document par ailleurs légitime, avec une erreur
 `reqif-preview` relève cette limite à **10 000** par défaut.
 
 ```ts
-// Document encore plus profondément imbriqué :
-const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 50_000 });
-
-// À l'inverse, si vous traitez des fichiers non fiables et voulez une
-// protection plus stricte contre les fichiers malveillants :
+// Si vous traitez des fichiers non fiables et voulez une protection plus
+// stricte contre les fichiers malveillants :
 const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 200 });
 ```
 
+Relever le garde-fou relève le plafond du parseur, pas tous les plafonds. Du texte enrichi
+profondément imbriqué dans un attribut est parcouru sans récursion et va aussi profond que
+le garde-fou l'autorise. Une **hiérarchie de spécifications** profonde, non : elle est
+encore parcourue récursivement, donc une hiérarchie de plusieurs milliers de niveaux peut
+épuiser la pile d'appels avant d'atteindre la limite configurée, et l'erreur obtenue est
+alors un `RangeError` plutôt qu'un `ReqIfParseError`. Les hiérarchies de cette profondeur
+n'apparaissent pas dans les exports des outils usuels.
+
 ## Entités XML
 
-`fast-xml-parser` applique le même type de garde-fou pour le traitement des entités XML
-(`&amp;`, `&quot;`, déclarations `<!ENTITY>`…) : selon la version, la limite par défaut
-tourne autour de **1000** occurrences ou déclarations au total dans le document. Un export
-volumineux la dépasse simplement en ayant beaucoup d'esperluettes et de guillemets dans
-son texte, avec une erreur du type `Entity count exceeds maximum allowed` ou
-`Entity expansion limit exceeded`.
+`fast-xml-parser` applique le même type de garde-fou au traitement des entités XML, et il
+vaut la peine de savoir ce qu'il compte. La limite qui se déclenche sur un document
+légitime compte les **déclarations** `<!ENTITY>` — un DOCTYPE généré par un outil, avec
+beaucoup d'entités nommées — et non les références : les `&amp;` et `&quot;` du texte n'y
+entrent pas. Une limite distincte borne le total des expansions, et savoir si les
+références ordinaires en relèvent dépend de la version du parseur. Les erreurs
+ressemblent à `Entity count exceeds maximum allowed` ou `Entity expansion limit
+exceeded`.
 
 `reqif-preview` relève également ces limites par défaut.
 
@@ -82,9 +89,9 @@ d'être améliorée.
 
 ### Différer le panneau technique
 
-Chaque exigence porte un panneau technique replié qui liste ses attributs, et c'est la plus
-grande part du DOM que cette bibliothèque émet. Avec le défaut, ces éléments sont
-construits que quelqu'un ouvre le panneau ou non.
+Chaque exigence porte un panneau technique replié qui liste ses attributs. Avec le défaut,
+ses éléments sont construits avant que quiconque l'ouvre, et sur un document dont les
+exigences portent beaucoup d'attributs, cela représente une grande part du DOM émis.
 
 ```ts
 const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
@@ -94,9 +101,9 @@ expandLazyPanels();
 
 `"lazy"` conserve le contenu du panneau dans un bloc inerte et diffère la construction de
 ses éléments DOM jusqu'à leur expansion par JavaScript. Il réduit le DOM initial. Il ne
-réduit pas la chaîne HTML — qui s'allonge un peu, le contenu voyageant toujours — et ne
-promet aucun rapport sur le temps : savoir s'il paie dépend du document, donc mesurez-le
-sur le vôtre.
+réduit pas la chaîne HTML : le contenu voyage toujours, donc la chaîne n'est pas
+nécessairement plus courte et peut être plus longue. Et il ne promet aucun rapport sur le
+temps — savoir s'il paie dépend du document, donc mesurez-le sur le vôtre.
 
 `expandLazyPanels()` est obligatoire : voir
 [Faire fonctionner les panneaux paresseux](/fr/api/#faire-fonctionner-les-panneaux-paresseux)
@@ -106,16 +113,18 @@ ne demande rien.
 
 ### À quoi s'attendre, et ce qui n'aidera pas
 
-Le parsing est un appel synchrone indivisible, pendant lequel la page est figée. Le
-déplacer dans un Web Worker est la seule chose qui le retire du fil principal, et le modèle
-qu'il produit survit à `structuredClone` ; le résolveur de pièces jointes, non, car il
-porte des méthodes.
+Le parsing est un appel synchrone indivisible : l'exécuter sur le fil principal retarde
+donc les interactions pendant toute sa durée. Le déplacer dans un Web Worker est le moyen
+de sortir ce travail du fil principal, et le modèle qu'il produit survit à
+`structuredClone` ; le résolveur de pièces jointes, non, car il porte des méthodes.
 
-Le pic mémoire est la limite la plus dure, et c'est lui qui tuera un onglet avant les
-secondes. Le modèle est construit entièrement en mémoire, en un seul passage, et aucune
-option ici n'y change quoi que ce soit. Un chargement coûte un multiple de la taille du
-fichier plutôt que cette taille, et ce multiple dépend du document — le seul chiffre qui
-vaille est donc celui que vous mesurez sur les fichiers que vous ouvrez vraiment.
+La mémoire mérite une attention propre, et c'est souvent elle qui limite la taille de
+fichier qu'une page peut ouvrir. Le modèle est construit entièrement en mémoire, en un seul
+passage ; la chaîne HTML coexiste avec lui le temps du rendu ; et le DOM que le navigateur
+en construit s'ajoute aux deux. Ce que cela représente dépend du document et de la façon
+dont vous intégrez la bibliothèque — réduire le HTML ou le DOM initial en change une part,
+le modèle restant complet. Le chiffre qui compte est celui que vous mesurez dans
+l'environnement que vous livrez.
 
 ::: tip Mesurez votre propre fichier
 La taille d'un fichier en dit moins que ce qu'il contient : deux documents de même taille
@@ -125,16 +134,16 @@ chaque exigence et la profondeur de son texte riche.
 ```ts
 const started = performance.now();
 const loaded = await loadReqIfPackage(bytes);
-const parsed = performance.now();
+const afterLoad = performance.now();
 const html = await renderPackageToHtml(loaded);
-const rendered = performance.now();
+const afterRender = performance.now();
 document.getElementById("preview")!.innerHTML = html;
-const shown = performance.now();
+const afterInsert = performance.now();
 
 console.log({
-  parse: parsed - started,
-  render: rendered - parsed,
-  dom: shown - rendered,          // le plus gros des trois, en général
+  load: afterLoad - started,          // décodage, parsing, construction du modèle
+  render: afterRender - afterLoad,
+  insert: afterInsert - afterRender,  // insertion seule ; n'attend ni la mise en page ni la peinture
 });
 ```
 :::

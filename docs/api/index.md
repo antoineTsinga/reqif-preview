@@ -104,8 +104,9 @@ and `technicalPanel` decides how it is emitted.
 | `"off"` | nothing |
 
 The default writes it out, which needs no JavaScript and nothing from you. `"lazy"` gives a
-smaller initial DOM on a large file, at the price of an initialisation call and a slightly
-longer string — see [Heavy files](/guide/large-documents#heavy-files) for how to decide.
+smaller initial DOM, at the price of an initialisation call and a string that is not
+necessarily shorter — see [Heavy files](/guide/large-documents#heavy-files) for how to
+decide.
 `"off"` drops the panel entirely if you simply do not want it.
 
 ### Making lazy panels open

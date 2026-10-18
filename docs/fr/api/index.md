@@ -106,8 +106,8 @@ attributs, et `technicalPanel` décide de la façon dont il est émis.
 | `"off"` | rien |
 
 Le défaut l'écrit, ce qui ne demande aucun JavaScript et rien de votre part. `"lazy"` donne
-un DOM initial plus petit sur un gros fichier, au prix d'un appel d'initialisation et d'une
-chaîne un peu plus longue — voir
+un DOM initial plus petit, au prix d'un appel d'initialisation et d'une chaîne qui n'est
+pas nécessairement plus courte — voir
 [Fichiers lourds](/fr/guide/gros-documents#fichiers-lourds) pour savoir comment choisir.
 `"off"` supprime le panneau entièrement si vous n'en voulez simplement pas.
 

@@ -17,22 +17,27 @@ document, with a `Maximum nested tags exceeded` error.
 `reqif-preview` raises the limit to **10,000** by default.
 
 ```ts
-// An even more deeply nested document:
-const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 50_000 });
-
-// The other way round, if you process untrusted files and want stricter
-// protection against malicious ones:
+// If you process untrusted files and want stricter protection against
+// malicious ones:
 const pkg = await loadReqIfPackage(bytes, { maxNestedTags: 200 });
 ```
 
+Raising the guard raises the parser's ceiling, not every ceiling. Deeply nested rich text
+inside an attribute is walked without recursion and goes as deep as the guard allows. A
+deeply nested **specification hierarchy** is not: it is still walked recursively, so a
+hierarchy thousands of levels deep can exhaust the call stack before the configured limit
+is reached, and the error you get then is a `RangeError` rather than a `ReqIfParseError`.
+Hierarchies that deep do not occur in exports written by the usual tools.
+
 ## XML entities
 
-`fast-xml-parser` applies the same kind of guard to XML entity processing (`&amp;`,
-`&quot;`, `<!ENTITY>` declarations…): depending on the version, the default limit sits
-around **1000** occurrences or declarations in the whole document. A large export exceeds
-it simply by having plenty of ampersands and quotation marks in its text, with an error
-along the lines of `Entity count exceeds maximum allowed` or
-`Entity expansion limit exceeded`.
+`fast-xml-parser` applies the same kind of guard to XML entity processing, and it is worth
+knowing what it counts. The limit that trips on a legitimate document is a count of
+`<!ENTITY>` **declarations** — a tool-generated DOCTYPE with many named entities — not a
+count of references: `&amp;` and `&quot;` in the text are not counted by it. A separate
+limit bounds total expansions, and whether ordinary references fall under it depends on the
+parser version. The errors read along the lines of `Entity count exceeds maximum allowed`
+or `Entity expansion limit exceeded`.
 
 `reqif-preview` raises these limits too.
 
@@ -79,9 +84,9 @@ improving.
 
 ### Deferring the technical panel
 
-Every requirement carries a collapsed technical panel listing its attributes, and it is
-the largest part of the DOM this library emits. Under the default those elements are built
-whether or not anyone opens the panel.
+Every requirement carries a collapsed technical panel listing its attributes. Under the
+default its elements are built before anyone opens it, and on a document whose
+requirements carry many attributes that is a large share of the emitted DOM.
 
 ```ts
 const html = await renderPackageToHtml(pkg, { technicalPanel: "lazy" });
@@ -91,8 +96,9 @@ expandLazyPanels();
 
 `"lazy"` keeps the panel's content in an inert block and defers building its DOM elements
 until JavaScript expands them. It reduces the initial DOM. It does not reduce the HTML
-string — that gets slightly longer, since the content still travels — and it promises no
-ratio on time: whether it pays depends on the document, so measure it on yours.
+string: the content still travels, so the string is not necessarily shorter and can be
+longer. And it promises no ratio on time — whether it pays depends on the document, so
+measure it on yours.
 
 `expandLazyPanels()` is required: see
 [Making lazy panels open](/api/#making-lazy-panels-open) for why, and for the
@@ -101,16 +107,17 @@ it entirely — along with the information it shows — and needs nothing.
 
 ### What to expect, and what will not help
 
-Parsing is one synchronous call that cannot be broken up, and the page is frozen for its
-duration. Moving that call to a Web Worker is the only thing that takes it off the main
-thread, and the model it produces survives `structuredClone`; the attachment resolver does
-not, as it carries methods.
+Parsing is one synchronous call that cannot be broken up, so running it on the main thread
+delays interactions for its duration. Moving it to a Web Worker is the way to take that
+work off the main thread, and the model it produces survives `structuredClone`; the
+attachment resolver does not, as it carries methods.
 
-Peak memory is the sharper limit, and it is what ends a browser tab before the seconds do.
-The model is built whole, in memory, in one pass, and no option here changes that. A load
-costs a multiple of the file's size rather than the size itself, and the multiple depends
-on the document — so the only figure worth having is the one you measure on the files you
-actually open.
+Memory deserves its own attention, and it is often what limits the size of file a page can
+open. The model is built whole, in memory, in one pass; the HTML string coexists with it
+while rendering; and the DOM the browser builds from that string adds to both. How much
+that comes to depends on the document and on how you integrate the library — reducing the
+HTML or the initial DOM changes part of it, while the model itself stays complete. The
+figure that matters is the one you measure in the environment you ship to.
 
 ::: tip Measure your own file
 A file's size says less than what is inside it: two documents of the same size can differ
@@ -129,7 +136,7 @@ const afterInsert = performance.now();
 console.log({
   load: afterLoad - started,          // decoding, parsing, building the model
   render: afterRender - afterLoad,
-  insert: afterInsert - afterRender,  // node building; layout and paint come after
+  insert: afterInsert - afterRender,  // insertion only; does not wait for layout or paint
 });
 ```
 :::

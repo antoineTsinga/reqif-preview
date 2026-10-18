@@ -383,7 +383,7 @@ for (const value of obj.values) {
 
 Ce panneau est **volontairement jamais filtré** par la détection de cycle de vie : c'est la zone "transparence totale", qui liste tout, même ce qui est déjà résumé ailleurs (voir section 9).
 
-C'est cette exhaustivité qui en fait le poste le plus lourd de la sortie — deux tiers des nœuds émis — et donc l'objet de l'option `technicalPanel`. Les lignes ci-dessus sont construites de façon identique dans ses trois modes ; seule leur destination change : écrites dans le DOM (`"eager"`, le défaut), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`), ou abandonnées (`"off"`). La mesure qui a motivé cette option est en §11.
+C'est cette exhaustivité qui en fait, sur un document dont les exigences portent beaucoup d'attributs, une grande part des nœuds émis, et donc l'objet de l'option `technicalPanel`. Les lignes ci-dessus sont construites de façon identique dans ses trois modes ; seule leur destination change : écrites dans le DOM (`"eager"`, le défaut), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`), ou abandonnées (`"off"`). La mesure qui a motivé cette option est en §11.
 
 ### Onglets sans JavaScript, numérotation, mode lecture
 
