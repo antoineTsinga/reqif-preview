@@ -25,3 +25,6 @@ docs/public/exemple.reqifz
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 docs/.vitepress/theme/hero-preview.generated.html
+
+# Échanges avec un autre agent : fixtures lourdes, hors du dépôt.
+discussions/
