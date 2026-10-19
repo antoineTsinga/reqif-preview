@@ -56,6 +56,11 @@ you do not supply one; return `{ bytes, mimeType }` to force it.
 `EMPTY_ATTACHMENTS` is a resolver that never finds anything — useful as an explicit
 default, and it is what `loadReqIfPackage` uses for a bare `.reqif`.
 
+A resolver that throws, or whose `getBytes` rejects, does not interrupt the render: the
+path is left unresolved, the `<object>` falls back to its alternative content, and an
+`attachment-unreadable` event carries the path and the step that failed, `"resolve"` or
+`"read"`. One unreachable image costs you that image, not the document.
+
 ## An `<object>`'s fallback chain
 
 The `<object>` element follows the chain the spec describes, in this order:

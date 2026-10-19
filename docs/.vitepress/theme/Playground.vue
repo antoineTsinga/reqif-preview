@@ -28,7 +28,7 @@ const MESSAGES = {
     tabs: "CSS tabs driven by the URL fragment",
     readingMode: "Reading view", chapterNumbers: "Number 1, 1.1, 1.2…",
     technical: "Technical panel open",
-    lazyPanel: "Build the technical panel only when opened — halves the DOM work",
+    lazyPanel: "Build the technical panel only when opened — smaller initial DOM, slightly longer string",
     simplified: "Simplified version rather than the original",
     relations: "Links between requirements",
     preview: "Preview", code: "Code", diagnostics: "Diagnostics",
@@ -53,7 +53,7 @@ const MESSAGES = {
     tabs: "Onglets CSS pilotés par le fragment d'URL",
     readingMode: "Vue de lecture", chapterNumbers: "Numéroter 1, 1.1, 1.2…",
     technical: "Panneau technique ouvert",
-    lazyPanel: "Ne construire le panneau technique qu'à l'ouverture — divise par deux le travail DOM",
+    lazyPanel: "Ne construire le panneau technique qu'à l'ouverture — DOM initial plus petit, chaîne un peu plus longue",
     simplified: "Version simplifiée plutôt que l'original",
     relations: "Liens entre exigences",
     preview: "Aperçu", code: "Code", diagnostics: "Diagnostics",
@@ -93,10 +93,11 @@ const error = ref("");
 const heavy = ref<{ bytes: Uint8Array; name: string } | null>(null);
 
 /**
- * 15 MB. The threshold is set on memory rather than on time, because memory is what
- * ends a tab: peak use runs 25 to 56 times the file's size, so 15 MB already means
- * 0.4 to 0.8 GB. Seconds of freeze are unpleasant; an out-of-memory kill loses the
- * file. Real exports are rarely above this, so the notice stays rare.
+ * The 15 MiB threshold is a precaution in this playground, not a bound on browser
+ * memory: peak usage depends on the document, the generated HTML, the DOM and the
+ * runtime. It is set on memory rather than on time because seconds of freeze are
+ * unpleasant while an out-of-memory kill loses the file. Real exports are rarely
+ * above this, so the notice stays rare.
  */
 const HEAVY_BYTES = 15 * 1024 * 1024;
 const busy = ref(false);

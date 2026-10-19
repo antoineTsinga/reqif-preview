@@ -1,12 +1,16 @@
 /**
  * The only JavaScript this library emits, and the reason it exists.
  *
- * Measurement (`npm run bench`) showed that putting the rendered HTML into the
- * DOM is the dominant cost — half the wait on a 5 MB export, 70 % on a 50 MB
- * one — and that two thirds of the emitted nodes are the per-requirement
- * technical panel, inside a `<details>` nobody has opened. A closed `<details>`
- * skips layout, but its nodes are built all the same, so they are paid for in
- * full before anyone asks to see them.
+ * The per-requirement technical panel sits inside a `<details>` nobody has
+ * opened, and under the default its elements belong to the initial DOM all the
+ * same: a closed `<details>` skips the layout of its contents, but the nodes
+ * are built before anyone asks to see them. How much of the document they
+ * account for depends on how many attributes each requirement carries, and
+ * varies between documents by several times over.
+ *
+ * What deferring them spares depends on the document, and the node count is a
+ * poor predictor of it: the deferred markup still travels, as a string that is
+ * not shorter. Hence an option rather than a default.
  *
  * So in `technicalPanel: "lazy"` mode the panel's markup travels inside a
  * `<script type="application/reqif-panel">` block. The browser does not parse a

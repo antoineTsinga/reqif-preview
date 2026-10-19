@@ -57,6 +57,11 @@ fournissez pas ; retournez `{ bytes, mimeType }` pour l'imposer.
 `EMPTY_ATTACHMENTS` est un résolveur qui ne trouve jamais rien — pratique comme valeur par
 défaut explicite, et c'est ce que `loadReqIfPackage` utilise pour un `.reqif` nu.
 
+Un résolveur qui lève, ou dont `getBytes` rejette, n'interrompt pas le rendu : le chemin
+reste non résolu, l'`<object>` retombe sur son contenu alternatif, et un événement
+`attachment-unreadable` porte le chemin et l'étape en cause, `"resolve"` ou `"read"`. Une
+image inaccessible vous coûte cette image, pas le document.
+
 ## La chaîne de repli d'un `<object>`
 
 L'élément `<object>` suit la chaîne décrite par la spec, dans cet ordre :

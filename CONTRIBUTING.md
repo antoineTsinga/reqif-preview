@@ -11,19 +11,33 @@ npm run typecheck
 
 ## Mesurer
 
-Les décisions de performance de ce dépôt reposent sur ces deux scripts, pas sur
-l'intuition. Le premier décompose chaque phase ; le second donne les deux chiffres que
-Node ne peut pas produire — l'insertion dans le DOM et la plus longue tâche bloquante.
+Les décisions de performance de ce dépôt reposent sur ces trois bancs, pas sur
+l'intuition. Chacun a son périmètre, et aucun chiffre ne se cite sans dire duquel il vient.
 
 ```bash
-npm run bench          # par phase, un process enfant par fixture (pic mémoire exact)
-npm run bench:browser  # insertion DOM + plus longue tâche, à lire dans le navigateur
+npm run bench              # par phase, un process enfant par fixture
+npm run bench:browser      # insertion DOM + plus longue tâche, à lire dans le navigateur
+npm run bench:code         # contrôles fonctionnels, puis mesures d'appels d'API Node
+npm run bench:code:checks  # les seuls contrôles fonctionnels, sans mesure
 ```
 
-`npm run bench` génère à la demande une fixture synthétique de ~50 Mo dans `.bench/`,
-gitignorée. L'export DOORS de 5 Mo est gitignoré lui aussi : s'il manque, le cas est
-ignoré et le banc le dit, plutôt que de laisser lire un tableau incomplet comme s'il était
-complet.
+`bench:code` exécute 18 contrôles fonctionnels qui **échouent en se nommant**, génère des
+entrées reproductibles dont il vérifie l'empreinte, et utilise un processus neuf par cas,
+par phase et par répétition pour ses mesures de temps. Ses mesures mémoire passent par des
+processus distincts, avec un seul chargement et rendu, sans chauffe : leur RSS reste le pic
+absolu d'un processus entier, pas une allocation supplémentaire ni la RAM minimale requise.
+Ses opérations chronométrées se recouvrent, donc leurs temps ne sont pas des parts de
+pipeline — et il ne mesure que des appels d'API Node, jamais l'insertion dans le DOM ni une
+latence perçue.
+
+`bench` rapporte le plus-haut RSS d'un processus qui enchaîne plusieurs phases et
+répétitions pour une fixture : ce compteur ne décrit donc pas un chargement unique. Il
+génère à la demande une fixture synthétique de ~50 Mo dans `.bench/`, gitignorée. L'export
+DOORS de 5 Mo est gitignoré lui aussi : s'il manque, le cas est ignoré et le banc le dit,
+plutôt que de laisser lire un tableau incomplet comme s'il était complet.
+
+`bench:browser` conserve un ordre fixe des variantes : ses écarts ne permettent pas
+d'isoler l'effet du mode.
 
 ## Le site de documentation
 

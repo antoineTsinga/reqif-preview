@@ -169,7 +169,7 @@ function parseSpecHierarchy(node: XNode): SpecHierarchy {
 }
 ```
 
-La profondeur de récursion JS correspond ici directement à la profondeur de l'arbre ReqIF — c'est exactement ce que `maxNestedTags` borne en amont, empêchant un débordement de pile sur un document pathologique.
+La profondeur de récursion JS correspond ici directement à la profondeur de l'arbre ReqIF. `maxNestedTags` borne l'imbrication XML en amont, mais ne protège pas ce parcours : la pile d'appels peut céder avant que la limite configurée soit atteinte, et l'erreur est alors un `RangeError` et non un `ReqIfParseError`.
 
 ---
 
@@ -188,19 +188,7 @@ Le contenu XHTML traverse **deux représentations distinctes**, jamais une seule
 1. **`XNode`** (interne, propre à `fast-xml-parser`, jamais exposé dans l'API publique)
 2. **`XhtmlNode`** (`{ type: "element", tag, attributes, children }` ou `{ type: "text", value }` — défini dans `types.ts`, complètement indépendant de la bibliothèque de parsing)
 
-`xhtml.ts` fait la traversée de conversion :
-
-```ts
-function xNodeToXhtml(node: XNode): XhtmlNode {
-  if (isTextNode(node)) return { type: "text", value: textOf(node) };
-  return {
-    type: "element",
-    tag: tagOf(node)!.toLowerCase(),       // "xhtml:div" déjà devenu "div" via removeNSPrefix
-    attributes: lowercased(attrsOf(node)),
-    children: childrenOf(node).map(xNodeToXhtml), // récursion
-  };
-}
-```
+`xhtml.ts` fait la traversée de conversion, sans jamais se rappeler récursivement : `shellOf` crée la coquille d'un nœud — un nœud texte, ou un élément dont le tag et les attributs sont minusculisés, avec `children` vide — puis une boucle dépile des couples nœud source / nœud cible. Pour chaque couple, elle crée la coquille de chaque enfant, l'attache dans l'ordre du document, et empile les enfants qui sont eux-mêmes des éléments. Le préfixe de namespace a déjà disparu à l'arrivée, `removeNSPrefix` étant actif, donc « xhtml:div » arrive comme « div ».
 
 **Pourquoi cette indirection plutôt que d'exposer `XNode` directement ?** Découpler la forme publique (`XhtmlNode`) de l'implémentation interne du parseur (`XNode`) signifie qu'on pourrait remplacer `fast-xml-parser` par n'importe quel autre parseur XML sans casser l'API publique ni le sanitizer (section 6), qui ne connaît que `XhtmlNode`.
 
@@ -233,7 +221,7 @@ Une fois construit, résoudre `typeRef`/`definitionRef`/`objectRef`/... coûte *
 
 ## 6. Assainissement (sanitization) du XHTML
 
-Le contenu XHTML d'un fichier ReqIF est une **donnée non fiable** (provenant d'un tiers), même si le format ne permet en théorie que des balises "sûres". `sanitize.ts` applique un algorithme de **liste blanche récursive en trois catégories** :
+Le contenu XHTML d'un fichier ReqIF est une **donnée non fiable** (provenant d'un tiers), même si le format ne permet en théorie que des balises "sûres". `sanitize.ts` applique un algorithme de **liste blanche en trois catégories**, sur une pile explicite plutôt que par récursion :
 
 ```
 pour chaque nœud de l'arbre XhtmlNode :
@@ -249,7 +237,7 @@ pour chaque nœud de l'arbre XhtmlNode :
      ALLOWED_TAGS           → balise conservée, attributs filtrés
      (div, p, table...)      (seuls `style` et `title`, plus quelques
                               attributs spécifiques par balise comme
-                              `colspan`/`href`), enfants récursés
+                              `colspan`/`href`), enfants parcourus sur la pile
 ```
 
 La distinction entre les deux derniers cas est importante : un `<font>` ou un `<center>` (pas dans la liste blanche, mais inoffensif) garde son texte visible ; un `<script>alert(1)</script>` (dans `DROP_ENTIRELY_TAGS`) disparaît **entièrement**, contenu compris — sinon le texte `alert(1)` apparaîtrait, non exécuté mais visible inutilement.
@@ -266,18 +254,23 @@ La clause 10.8.20 de la spec décrit un mécanisme de repli pour les objets exte
 </object>
 ```
 
-`renderObject` implémente ça par récursion directe sur les enfants :
+Descendre cette chaîne est un appel terminal, donc `resolveObject` l'implémente par une boucle :
 
 ```ts
-function renderObject(node): string {
-  const resolved = opts.attachments?.get(node.attributes["data"]);
-  if (resolved && mime.startsWith("image/")) return `<img src="${resolved.href}" ... />`;       // 1. image résolue
-  const nestedObject = node.children.find(c => c.tag === "object");
-  if (nestedObject) return renderObject(nestedObject, opts);                                     // 2. objet alternatif (récursion)
-  if (resolved) return `<a download="...">📎 ...</a>`;                                           // 3. fichier non-image résolu → lien de téléchargement
-  return renderChildren(node.children, opts);                                                    // 4. rien résolu → texte alternatif tel quel
+function resolveObject(node, opts) {
+  let current = node;
+  for (;;) {
+    const resolved = opts.attachments?.get(current.attributes["data"]);
+    if (resolved && mime.startsWith("image/")) return { html: `<img src="..." ... />` };      // 1. image résolue
+    const nested = current.children.find(c => c.tag === "object");
+    if (nested) { current = nested; continue; }                                                // 2. objet alternatif
+    if (resolved) return { html: `<a download="...">📎 ...</a>` };                             // 3. non-image résolu → lien
+    return { children: current.children };                                                     // 4. rien résolu → texte alternatif
+  }
 }
 ```
+
+Les quatre parcours de l'arbre XHTML — conversion, rendu assaini, extraction du texte et collecte des chemins — utilisent une pile explicite pour la même raison : une profondeur de récursion dépendant du moteur et de l'état du runtime n'est ni prévisible ni documentable. La hiérarchie de spécifications et la sérialisation des arbres retournés par un renderer personnalisé, elles, restent récursives.
 
 ### Assainissement de l'attribut `style`
 
@@ -301,7 +294,7 @@ Si ce n'est pas un ZIP, le contenu est traité comme du XML brut. Si c'est un ZI
 
 ### Pourquoi deux passes (collecte puis résolution) au rendu
 
-Le rendu HTML produit une **chaîne synchrone**, mais lire les octets d'une pièce jointe est **asynchrone** (`getBytes(): Promise<Uint8Array>`). Plutôt que de rendre toute la fonction de sérialisation HTML asynchrone (ce qui complexifierait chaque petite fonction récursive de `sanitize.ts`), le rendu est scindé en deux phases nettement séparées :
+Le rendu HTML produit une **chaîne synchrone**, mais lire les octets d'une pièce jointe est **asynchrone** (`getBytes(): Promise<Uint8Array>`). Plutôt que de rendre toute la fonction de sérialisation HTML asynchrone (ce qui complexifierait chaque petite fonction de `sanitize.ts`), le rendu est scindé en deux phases nettement séparées :
 
 ```
 Phase 1 (async, une seule fois par document) :
@@ -311,7 +304,7 @@ Phase 1 (async, une seule fois par document) :
     → Promise.all(...)                      // résout + lit chaque pièce jointe EN PARALLÈLE
     → Map<chemin, { href: data-URI, mimeType }>   ("AttachmentLookup")
 
-Phase 2 (synchrone, récursive, peut être appelée autant de fois que nécessaire) :
+Phase 2 (synchrone, itérative, peut être appelée autant de fois que nécessaire) :
   renderXhtmlContent(content, { attachments: lookupPhase1 })
     → AttachmentLookup.get(path) est un simple lookup de Map, donc instantané
 ```
@@ -383,7 +376,7 @@ for (const value of obj.values) {
 
 Ce panneau est **volontairement jamais filtré** par la détection de cycle de vie : c'est la zone "transparence totale", qui liste tout, même ce qui est déjà résumé ailleurs (voir section 9).
 
-C'est cette exhaustivité qui en fait le poste le plus lourd de la sortie — deux tiers des nœuds émis — et donc l'objet de l'option `technicalPanel`. Les lignes ci-dessus sont construites de façon identique dans ses trois modes ; seule leur destination change : écrites dans le DOM (`"eager"`, le défaut), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`), ou abandonnées (`"off"`). La mesure qui a motivé cette option est en §11.
+C'est cette exhaustivité qui en fait, sur un document dont les exigences portent beaucoup d'attributs, une grande part des nœuds émis, et donc l'objet de l'option `technicalPanel`. Les lignes ci-dessus sont construites de façon identique dans ses trois modes ; seule leur destination change : écrites dans le DOM (`"eager"`, le défaut), rangées dans un bloc inerte jusqu'à l'ouverture (`"lazy"`), ou abandonnées (`"off"`). La mesure qui a motivé cette option est en §11.
 
 ### Onglets sans JavaScript, numérotation, mode lecture
 
@@ -507,36 +500,28 @@ Avec *n* = nombre total de nœuds XML du document, *m* = nombre de pièces joint
 
 Aucune étape n'est quadratique : il n'y a jamais de recherche linéaire imbriquée dans une autre boucle sur l'ensemble du document — c'est précisément ce que `ReqIfIndex` est censé empêcher.
 
-### Ce que la mesure confirme, et ce qu'elle corrige
+### Ce que la mesure dit, et ce qu'elle ne dit pas
 
-Le tableau ci-dessus est asymptotique ; `npm run bench` donne les constantes. Sur un export DOORS réel de 4,94 Mo (1 024 exigences) et un synthétique de 49,8 Mo :
+Le tableau ci-dessus est asymptotique. Les constantes, elles, dépendent du document et du moteur, et les deux bancs de ce dépôt ne mesurent pas les mêmes phases : `npm run bench` n'a pas de DOM. Deux corpus mesurés séparément ont placé le poste le plus lourd à deux endroits différents. Aucun classement universel n'est donc énoncé ici, et un temps ne se cite pas sans son fichier, son moteur et son banc.
 
-| Phase | 4,94 Mo | 49,8 Mo |
-|---|---|---|
-| Parsing XML → modèle | 278 ms | 3 554 ms |
-| Construction de `ReqIfIndex` | 0,5 ms | 9,3 ms |
-| Résolution des pièces jointes | 0,5 ms | 12,7 ms |
-| Rendu en chaîne (1 spécification) | 99 ms | 3 217 ms |
-| **Insertion dans le DOM + mise en page** | **550 ms** | **22 211 ms** |
+Deux faits bornés, à ne pas lire comme des propriétés du code :
 
-La linéarité annoncée tient : 10× l'entrée donne 12,8× le temps de parsing, et l'index — l'étape que ce document présente comme la raison d'être de toute l'indexation — coûte réellement 0 % du total.
-
-Deux corrections s'imposent en revanche à l'intuition que le reste du document pourrait laisser :
-
-- **le coût dominant n'est pas le parsing mais l'insertion du HTML produit dans le DOM** : la moitié du temps subi sur un fichier réaliste, 70 % sur un gros. Cette étape est hors de la bibliothèque — elle appartient à l'appelant qui fait `innerHTML` — ce qui explique qu'elle ait longtemps échappé à l'analyse ;
-- **les deux tiers des nœuds émis étaient le panneau technique** (§8), à l'intérieur d'un `<details>` replié. Un `<details>` fermé saute la mise en page mais ses nœuds sont construits quand même, donc payés plein tarif. Sur l'export DOORS, les 70 230 balises se répartissaient en 62 % de panneau technique, 7 % de ligne de cycle de vie, 2,9 % de badge d'identifiant, et le reste en titres et contenu.
+- en mode `"eager"`, les éléments du panneau technique appartiennent au DOM initial, même si le panneau est replié. Le mode `"lazy"` diffère leur construction jusqu'à l'ouverture ; **leur nombre dépend des attributs et du contenu du document**, et leur part du total varie d'un document à l'autre dans un rapport de plusieurs fois ;
+- `ReqIfIndex` fournit les recherches par identifiant utilisées pendant le rendu ; son coût relatif se mesure sur le corpus concerné.
 
 ### Ce que la mesure a changé dans le code
 
-C'est la seconde observation qui a été traitée, et elle explique l'option `technicalPanel` de §8. En mode `"lazy"`, le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
+Ce mécanisme de construction différée explique l'option `technicalPanel` de §8. En mode `"lazy"`, le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
 
-| Mode | Nœuds DOM (DOORS) | Par exigence | Octets |
-|---|---|---|---|
-| `"eager"` (défaut) | 70 230 | 69 | 3,76 Mo |
-| `"lazy"` | **29 787** | **29** | 3,87 Mo |
-| `"off"` | 26 714 | 26 | 1,58 Mo |
+Sur un export DOORS précis, à titre d'exemple et non comme propriété des trois modes :
 
-Le balisage est toujours transmis : la sortie est donc ~3 % **plus grosse** en octets. Le gain est à l'analyse et à la mise en page, pas au transfert — c'est-à-dire précisément là où la mesure a trouvé le coût.
+| Mode | Nœuds DOM | Octets de sortie |
+|---|---|---|
+| `"eager"` (défaut) | 70 230 | 3,76 Mo |
+| `"lazy"` | **29 787** | 3,87 Mo |
+| `"off"` | 26 714 | 1,58 Mo |
+
+Le contenu du panneau est toujours généré et transmis en `"lazy"` : la sortie est donc **plus grosse** en octets, pas plus petite. Ce que ce mode réduit est le DOM initial, pas la chaîne.
 
 Le déploiement demande du JavaScript, ce qui est une première pour cette bibliothèque : les onglets, eux, reposent sur `:target` et n'en demandent aucun (§8). Deux chemins le fournissent, parce qu'un seul ne suffit pas — un `<script>` inséré via `innerHTML` ne s'exécute jamais, ce qui est la spécification HTML. L'export `expandLazyPanels()` couvre donc le navigateur, et l'option `includeJs: true` émet une copie inline pour un document rendu côté serveur. Un panneau dont ni l'un ni l'autre n'a été mis en place s'ouvre sur le message `labels.technicalUnavailable`, jamais sur du vide.
 
@@ -565,5 +550,5 @@ Quelques incarnations concrètes de ce principe, déjà rencontrées dans les se
 - `isBalancedHtml` reste une heuristique de bon sens, pas un parseur HTML conforme : un cas pathologique extrêmement spécifique (par ex. exploitant les règles de fermeture implicite du HTML5 sur `<li>`/`<p>`/cellules de tableau) pourrait en théorie passer entre les mailles. Le compromis accepté est : zéro dépendance supplémentaire, contre une couverture "assez bonne pour les erreurs humaines courantes".
 - La détection des métadonnées de cycle de vie (`lifecycle.ts`) repose sur une convention de nommage non normalisée par l'OMG — un outil qui n'utilise aucune des variantes reconnues (`ReqIF.ForeignID`, `Foreign ID`, etc.) ne sera simplement pas détecté automatiquement ; c'est pour ce cas que `titleAttributes`/`contentAttributes`/`customAttributeRenderers` existent comme échappatoires explicites.
 - `maxNestedTags` est une limite globale par appel de parsing, pas par section du document : un document légitimement profond sur un seul attribut XHTML partage le même budget que la profondeur de la hiérarchie des spécifications.
-- **Le pic mémoire vaut 25 à 56 fois la taille du fichier d'entrée** (1,28 Go pour 49,8 Mo, 329 Mo pour 4,94 Mo). Le modèle est construit entièrement en mémoire, en un seul passage, et le HTML produit — 64 Mo de chaîne pour 49,8 Mo d'entrée — coexiste avec lui le temps du rendu. C'est cette contrainte, et non le temps de calcul, qui plafonne la taille de fichier exploitable dans un onglet. Un parsing en flux (SAX) la lèverait ; rien d'autre ne la lèvera.
-- **Le rendu est monolithique** : `renderPackageToHtml` retourne une seule chaîne, que l'appelant ne peut insérer qu'en un bloc. L'insertion devient alors la phase la plus coûteuse de la chaîne (§11) et bloque le fil principal sans découpage possible — un Web Worker n'y change rien, le DOM n'étant accessible que depuis le fil principal. `renderSpecification` est exporté précisément pour laisser une interface construire son propre affichage progressif ; il n'existe pas encore d'API d'arbre plus fine (`getChildren`, `getRequirement`).
+- **Le pic mémoire vaut un multiple de la taille du fichier d'entrée**, et ce multiple dépend du document. Le modèle est construit entièrement en mémoire, en un seul passage, et le HTML produit coexiste avec lui le temps du rendu. C'est cette contrainte, et non le temps de calcul, qui plafonne la taille de fichier exploitable dans un onglet. Un parsing en flux la bornerait ; le choix de sortie, le DOM construit et le runtime y contribuent aussi, donc ce n'est pas le seul levier.
+- **Le rendu est monolithique** : `renderPackageToHtml` retourne une seule chaîne, que l'appelant ne peut insérer qu'en un bloc. L'insertion se fait alors d'un seul bloc et bloque le fil principal sans découpage possible — un Web Worker n'y change rien, le DOM n'étant accessible que depuis le fil principal. `renderSpecification` est exporté précisément pour laisser une interface construire son propre affichage progressif ; il n'existe pas encore d'API d'arbre plus fine (`getChildren`, `getRequirement`).

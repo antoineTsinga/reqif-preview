@@ -34,6 +34,7 @@ interface DegradationEvent {
 type DegradationCode =
   | "attachment-missing"
   | "attachment-too-large"
+  | "attachment-unreadable"
   | "unresolved-reference"
   | "orphan-attribute-value"
   | "missing-spec-object"

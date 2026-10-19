@@ -9,10 +9,11 @@
  *
  * Two deliberate choices about method:
  *
- *   - Each fixture runs in its own child process, so peak memory can be read
- *     from `process.resourceUsage().maxRSS`. That counter is a high-water mark
- *     that never decreases, which makes it useless within a process and exact
- *     across one.
+ *   - Each fixture runs in its own child process, so `maxRSS` from
+ *     `process.resourceUsage()` describes that fixture and no other. The counter
+ *     is a high-water mark that never decreases, so what it reports is the peak
+ *     of a process that warmed up and repeated every phase — not the peak of a
+ *     single load, and not a minimum requirement.
  *
  *   - Every phase is warmed up and repeated, and the report shows the minimum
  *     alongside the median. A single shot mostly measures JIT warmup: the first
@@ -204,8 +205,8 @@ async function runCase(file) {
     // that becomes DOM from the markup that merely travels -- which is the
     // whole mechanism behind the default lazy technical panel.
     domNodes: countDomNodes(html),
-    // maxRSS is a high-water mark for the whole process: exact here, because
-    // this process measured exactly one fixture.
+    // High-water mark of this whole process, which ran every phase warmed and
+    // repeated: this fixture's figure, not one load's peak.
     maxRssMb: process.resourceUsage().maxRSS / 1024,
     phases,
   };

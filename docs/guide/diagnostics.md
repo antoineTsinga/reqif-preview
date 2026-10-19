@@ -2,10 +2,14 @@
 
 <!--@include: ../_conventions.md-->
 
-Past the parsing stage, **nothing throws**. A surprising input degrades locally and the
-rest of the document still renders. That is the right behaviour in production — a
-requirements preview beats a blank page — and a miserable one in support: faced with
-"things are missing from my preview", there is nothing to inspect.
+The cases listed below **degrade locally and emit a diagnostic**: a surprising input costs
+you that one thing and the rest of the document still renders. That is the right behaviour
+in production — a requirements preview beats a blank page — and a miserable one in support:
+faced with "things are missing from my preview", there is nothing to inspect.
+
+This mechanism does not cover every exception. The walks that are still recursive have
+their own limits, described in
+[Deeply nested documents](/guide/large-documents#what-by-contrast-degrades).
 
 ```ts
 import type { DegradationEvent } from "reqif-preview";
@@ -29,6 +33,7 @@ a change in behaviour.
 |---|---|
 | `attachment-missing` | a referenced attachment no resolver can find |
 | `attachment-too-large` | an attachment over `maxInlineBytes`, left unresolved |
+| `attachment-unreadable` | a resolver that threw or rejected, leaving the attachment unresolved |
 | `unresolved-reference` | a `SpecRelation` pointing at an object absent from the render |
 | `duplicate-dom-id` | an object rendered more than once; only the first carries the `id` |
 | `orphan-attribute-value` | a value whose `AttributeDefinition` is absent from the declared `SpecType` |
@@ -74,7 +79,7 @@ it was observing would be worse than no channel at all.
 
 | Reported symptom | Code to look for |
 |---|---|
-| "The images do not show" | `attachment-missing`, `attachment-too-large` |
+| "The images do not show" | `attachment-missing`, `attachment-too-large`, `attachment-unreadable` |
 | "This traceability link goes nowhere" | `unresolved-reference` |
 | "Clicking a link takes me to the wrong place" | `duplicate-dom-id` |
 | "A whole requirement is missing" | `missing-spec-object` |

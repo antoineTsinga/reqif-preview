@@ -2,10 +2,15 @@
 
 <!--@include: ../_conventions.md-->
 
-Passé l'étape de parsing, **rien ne lève**. Une entrée surprenante dégrade localement et le
-reste du document se rend quand même. C'est le bon comportement en production — un aperçu
-d'exigences vaut mieux qu'une page blanche — et c'est pénible en support : face à « il
-manque des trucs dans mon aperçu », il n'y avait aucun moyen d'obtenir un rapport.
+Les cas listés ci-dessous **dégradent localement et émettent un diagnostic** : une entrée
+surprenante ne vous coûte que cette chose-là, et le reste du document se rend quand même.
+C'est le bon comportement en production — un aperçu d'exigences vaut mieux qu'une page
+blanche — et c'est pénible en support : face à « il manque des trucs dans mon aperçu », il
+n'y avait aucun moyen d'obtenir un rapport.
+
+Ce mécanisme ne couvre pas toute exception. Les parcours encore récursifs ont leurs propres
+limites, décrites dans
+[Documents très imbriqués](/fr/guide/gros-documents#ce-qui-en-revanche-degrade).
 
 ```ts
 import type { DegradationEvent } from "reqif-preview";
@@ -29,6 +34,7 @@ craindre un changement de comportement.
 |---|---|
 | `attachment-missing` | pièce jointe référencée qu'aucun résolveur ne trouve |
 | `attachment-too-large` | pièce jointe dépassant `maxInlineBytes`, laissée non résolue |
+| `attachment-unreadable` | résolveur qui a levé ou rejeté, pièce jointe laissée non résolue |
 | `unresolved-reference` | `SpecRelation` visant un objet absent du rendu |
 | `duplicate-dom-id` | objet rendu plusieurs fois ; seule la première occurrence porte l'`id` |
 | `orphan-attribute-value` | valeur dont l'`AttributeDefinition` est absente du `SpecType` déclaré |
@@ -74,7 +80,7 @@ casse ce qu'il observe serait pire que pas de canal du tout.
 
 | Symptôme rapporté | Code à chercher |
 |---|---|
-| « Les images ne s'affichent pas » | `attachment-missing`, `attachment-too-large` |
+| « Les images ne s'affichent pas » | `attachment-missing`, `attachment-too-large`, `attachment-unreadable` |
 | « Ce lien de traçabilité ne mène nulle part » | `unresolved-reference` |
 | « Cliquer sur un lien m'amène au mauvais endroit » | `duplicate-dom-id` |
 | « Il manque une exigence entière » | `missing-spec-object` |
