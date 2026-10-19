@@ -11,38 +11,33 @@ npm run typecheck
 
 ## Mesurer
 
-Les décisions de performance de ce dépôt reposent sur ces deux scripts, pas sur
-l'intuition. Le premier décompose chaque phase ; le second donne les deux chiffres que
-Node ne peut pas produire — l'insertion dans le DOM et la plus longue tâche bloquante.
+Les décisions de performance de ce dépôt reposent sur ces trois bancs, pas sur
+l'intuition. Chacun a son périmètre, et aucun chiffre ne se cite sans dire duquel il vient.
 
 ```bash
-npm run bench          # par phase, un process enfant par fixture
-npm run bench:browser  # insertion DOM + plus longue tâche, à lire dans le navigateur
-npm run bench:code     # banc indépendant : contrôles fonctionnels puis mesures Node
+npm run bench              # par phase, un process enfant par fixture
+npm run bench:browser      # insertion DOM + plus longue tâche, à lire dans le navigateur
+npm run bench:code         # contrôles fonctionnels, puis mesures d'appels d'API Node
 npm run bench:code:checks  # les seuls contrôles fonctionnels, sans mesure
 ```
 
-`bench:code` vient d'une revue croisée : il a été écrit contre `src/` sans emprunter aux
-deux autres bancs, et ses trois fichiers sont ceux de l'artefact audité, octet pour octet,
-pour que leur empreinte reste vérifiable. Ses 18 contrôles fonctionnels **échouent en se
-nommant**, il génère ses propres entrées de façon reproductible, il lance un processus par
-cas et par échantillon, et il déclare les phases qu'aucune entrée n'exerce au lieu
-d'afficher un temps pour elles. C'est aussi lui qui refuse de publier des parts de
-pipeline, les opérations mesurées se recouvrant.
+`bench:code` exécute 18 contrôles fonctionnels qui **échouent en se nommant**, génère des
+entrées reproductibles dont il vérifie l'empreinte, et utilise un processus neuf par cas,
+par phase et par répétition pour ses mesures de temps. Ses mesures mémoire passent par des
+processus distincts, avec un seul chargement et rendu, sans chauffe : leur RSS reste le pic
+absolu d'un processus entier, pas une allocation supplémentaire ni la RAM minimale requise.
+Ses opérations chronométrées se recouvrent, donc leurs temps ne sont pas des parts de
+pipeline — et il ne mesure que des appels d'API Node, jamais l'insertion dans le DOM ni une
+latence perçue.
 
-Il ne mesure que des appels d'API Node : jamais l'insertion dans le DOM ni une latence
-perçue.
+`bench` rapporte le plus-haut RSS d'un processus qui enchaîne plusieurs phases et
+répétitions pour une fixture : ce compteur ne décrit donc pas un chargement unique. Il
+génère à la demande une fixture synthétique de ~50 Mo dans `.bench/`, gitignorée. L'export
+DOORS de 5 Mo est gitignoré lui aussi : s'il manque, le cas est ignoré et le banc le dit,
+plutôt que de laisser lire un tableau incomplet comme s'il était complet.
 
-`npm run bench` génère à la demande une fixture synthétique de ~50 Mo dans `.bench/`,
-gitignorée. L'export DOORS de 5 Mo est gitignoré lui aussi : s'il manque, le cas est
-ignoré et le banc le dit, plutôt que de laisser lire un tableau incomplet comme s'il était
-complet.
-
-Deux limites à connaître avant de citer un de ces chiffres. Le banc Node rapporte le
-plus-haut RSS du processus de benchmark, lequel exécute plusieurs phases et répétitions
-pour une fixture : cette valeur n'est ni le pic d'un chargement unique, ni la RAM minimale
-requise. Et le comparatif navigateur exécute les variantes dans un ordre fixe, donc ses
-écarts ne s'interprètent pas comme l'effet isolé du mode.
+`bench:browser` conserve un ordre fixe des variantes : ses écarts ne permettent pas
+d'isoler l'effet du mode.
 
 ## Le site de documentation
 
