@@ -2,16 +2,15 @@
  * The only JavaScript this library emits, and the reason it exists.
  *
  * The per-requirement technical panel sits inside a `<details>` nobody has
- * opened, and it is most of the markup: deferring it removes about two thirds
- * of the emitted nodes on a plain export, and far more when requirements carry
- * many attributes. A closed `<details>` skips the layout of its contents, but
- * its nodes are built all the same, so they are paid for before anyone asks to
- * see them.
+ * opened, and under the default its elements belong to the initial DOM all the
+ * same: a closed `<details>` skips the layout of its contents, but the nodes
+ * are built before anyone asks to see them. How much of the document they
+ * account for depends on how many attributes each requirement carries, and
+ * varies between documents by several times over.
  *
- * Which phase that spares depends on the document — parsing leads on some,
- * insertion on others — and the node count is a poor predictor of the saving,
- * since the deferred markup still travels as a longer string. Hence an option
- * rather than a default.
+ * What deferring them spares depends on the document, and the node count is a
+ * poor predictor of it: the deferred markup still travels, as a string that is
+ * not shorter. Hence an option rather than a default.
  *
  * So in `technicalPanel: "lazy"` mode the panel's markup travels inside a
  * `<script type="application/reqif-panel">` block. The browser does not parse a

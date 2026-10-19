@@ -93,10 +93,11 @@ const error = ref("");
 const heavy = ref<{ bytes: Uint8Array; name: string } | null>(null);
 
 /**
- * 15 MB. The threshold is set on memory rather than on time, because memory is what
- * ends a tab: a load peaks at a multiple of the file's size, so a file this big already
- * costs hundreds of megabytes. Seconds of freeze are unpleasant; an out-of-memory kill
- * loses the file. Real exports are rarely above this, so the notice stays rare.
+ * The 15 MiB threshold is a precaution in this playground, not a bound on browser
+ * memory: peak usage depends on the document, the generated HTML, the DOM and the
+ * runtime. It is set on memory rather than on time because seconds of freeze are
+ * unpleasant while an out-of-memory kill loses the file. Real exports are rarely
+ * above this, so the notice stays rare.
  */
 const HEAVY_BYTES = 15 * 1024 * 1024;
 const busy = ref(false);

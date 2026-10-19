@@ -504,14 +504,14 @@ Aucune étape n'est quadratique : il n'y a jamais de recherche linéaire imbriqu
 
 Le tableau ci-dessus est asymptotique. Les constantes, elles, dépendent du document et du moteur, et les deux bancs de ce dépôt ne mesurent pas les mêmes phases : `npm run bench` n'a pas de DOM. Deux corpus mesurés séparément ont placé le poste le plus lourd à deux endroits différents. Aucun classement universel n'est donc énoncé ici, et un temps ne se cite pas sans son fichier, son moteur et son banc.
 
-Ce qui est structurel, et ne dépend pas d'un corpus :
+Deux faits bornés, à ne pas lire comme des propriétés du code :
 
-- **le panneau technique est la plus grande part des éléments DOM émis** (§8), à l'intérieur d'un `<details>` replié. Ses nœuds existent dans le DOM même si personne n'ouvre le panneau : c'est ce que l'option `technicalPanel` permet de différer ;
-- **`ReqIfIndex` n'apparaît pas dans les coûts mesurés**, ce qui est cohérent avec la complexité annoncée plus haut — ce n'est pas la première chose à optimiser.
+- en mode `"eager"`, les éléments du panneau technique appartiennent au DOM initial, même si le panneau est replié. Le mode `"lazy"` diffère leur construction jusqu'à l'ouverture ; **leur nombre dépend des attributs et du contenu du document**, et leur part du total varie d'un document à l'autre dans un rapport de plusieurs fois ;
+- `ReqIfIndex` fournit les recherches par identifiant utilisées pendant le rendu ; son coût relatif se mesure sur le corpus concerné.
 
 ### Ce que la mesure a changé dans le code
 
-C'est la seconde observation qui a été traitée, et elle explique l'option `technicalPanel` de §8. En mode `"lazy"`, le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
+Ce mécanisme de construction différée explique l'option `technicalPanel` de §8. En mode `"lazy"`, le balisage du panneau voyage dans un bloc `<script type="application/reqif-panel">`, dont le navigateur n'analyse pas le contenu comme du HTML, et ne devient de vrais nœuds qu'à l'ouverture du panneau.
 
 Sur un export DOORS précis, à titre d'exemple et non comme propriété des trois modes :
 
